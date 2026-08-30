@@ -1,21 +1,27 @@
 'use strict';
 
-const puppeteer = require('puppeteer-core');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
+const fs   = require('fs');
+const os   = require('os');
 
 async function renderSlide(html, outputPath) {
+  const puppeteer = require('puppeteer');
+
   const browser = await puppeteer.launch({
-    executablePath: process.env.CHROMIUM_PATH || '/data/data/com.termux/files/usr/bin/chromium-browser',
     headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
   });
 
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 60000 });
+    await page.evaluate(() => document.fonts.ready);
     await page.screenshot({ path: outputPath, type: 'png' });
   } finally {
     await browser.close();
@@ -23,7 +29,7 @@ async function renderSlide(html, outputPath) {
 }
 
 async function renderAllSlides(htmlSlides) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'slides-'));
+  const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'slides-'));
   const pngPaths = [];
 
   for (let i = 0; i < htmlSlides.length; i++) {
