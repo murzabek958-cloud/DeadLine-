@@ -5,7 +5,6 @@ const fs   = require('fs');
 const os   = require('os');
 
 async function renderSlide(html, outputPath) {
-  // puppeteer өзінің Chrome-ын табады автоматты
   const puppeteer = require('puppeteer');
 
   const browser = await puppeteer.launch({
