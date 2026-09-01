@@ -3,7 +3,9 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'users.json');
+// Railway Volume болса /data, болмаса локал
+const DATA_DIR = fs.existsSync('/data') ? '/data' : path.join(__dirname);
+const DB_PATH  = path.join(DATA_DIR, 'users.json');
 
 function load() {
   if (!fs.existsSync(DB_PATH)) return {};
@@ -46,4 +48,7 @@ function setFreeUsed(chatId) {
   save(db);
 }
 
+console.log('[DB] Storage path:', DB_PATH);
+
 module.exports = { getUser, addCredits, useCredit, setFreeUsed };
+    
