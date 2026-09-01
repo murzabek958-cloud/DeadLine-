@@ -1,54 +1,61 @@
-'use strict';
+''use strict';
 
-const fs   = require('fs');
-const path = require('path');
+const { Client } = require('pg');
 
-// Railway Volume болса /data, болмаса локал
-const DATA_DIR = fs.existsSync('/data') ? '/data' : path.join(__dirname);
-const DB_PATH  = path.join(DATA_DIR, 'users.json');
+let client = null;
 
-function load() {
-  if (!fs.existsSync(DB_PATH)) return {};
-  try { return JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch { return {}; }
+async function getClient() {
+  if (client) return client;
+  client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  await client.connect();
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      chat_id    TEXT PRIMARY KEY,
+      credits    INTEGER DEFAULT 0,
+      total      INTEGER DEFAULT 0,
+      free_used  BOOLEAN DEFAULT FALSE
+    )
+  `);
+  console.log('[DB] PostgreSQL connected');
+  return client;
 }
 
-function save(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+async function getUser(chatId) {
+  const db = await getClient();
+  const res = await db.query('SELECT * FROM users WHERE chat_id = $1', [String(chatId)]);
+  if (!res.rows.length) return { credits: 0, total: 0, freeUsed: false };
+  const r = res.rows[0];
+  return { credits: r.credits, total: r.total, freeUsed: r.free_used };
 }
 
-function getUser(chatId) {
-  const db = load();
-  return db[String(chatId)] || { credits: 0, total: 0, freeUsed: false };
+async function addCredits(chatId, amount) {
+  const db = await getClient();
+  await db.query(`
+    INSERT INTO users (chat_id, credits, total, free_used)
+    VALUES ($1, $2, $2, FALSE)
+    ON CONFLICT (chat_id) DO UPDATE
+    SET credits = users.credits + $2,
+        total   = users.total   + $2
+  `, [String(chatId), amount]);
+  return getUser(chatId);
 }
 
-function addCredits(chatId, amount) {
-  const db = load();
-  const id = String(chatId);
-  if (!db[id]) db[id] = { credits: 0, total: 0, freeUsed: false };
-  db[id].credits += amount;
-  db[id].total   += amount;
-  save(db);
-  return db[id];
-}
-
-function useCredit(chatId) {
-  const db = load();
-  const id = String(chatId);
-  if (!db[id] || db[id].credits < 1) return false;
-  db[id].credits -= 1;
-  save(db);
+async function useCredit(chatId) {
+  const db = await getClient();
+  const user = await getUser(chatId);
+  if (user.credits < 1) return false;
+  await db.query('UPDATE users SET credits = credits - 1 WHERE chat_id = $1', [String(chatId)]);
   return true;
 }
 
-function setFreeUsed(chatId) {
-  const db = load();
-  const id = String(chatId);
-  if (!db[id]) db[id] = { credits: 0, total: 0, freeUsed: false };
-  db[id].freeUsed = true;
-  save(db);
+async function setFreeUsed(chatId) {
+  const db = await getClient();
+  await db.query(`
+    INSERT INTO users (chat_id, credits, total, free_used)
+    VALUES ($1, 0, 0, TRUE)
+    ON CONFLICT (chat_id) DO UPDATE
+    SET free_used = TRUE
+  `, [String(chatId)]);
 }
 
-console.log('[DB] Storage path:', DB_PATH);
-
 module.exports = { getUser, addCredits, useCredit, setFreeUsed };
-    
