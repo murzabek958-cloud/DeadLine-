@@ -21,13 +21,19 @@ async function initDB() {
 }
 
 async function getUser(chatId) {
-  const res = await pool.query(
-    'SELECT credits, total, free_used FROM users WHERE chat_id = $1',
-    [String(chatId)]
-  );
-  if (!res.rows.length) return { credits: 0, total: 0, freeUsed: false };
-  const r = res.rows[0];
-  return { credits: r.credits, total: r.total, freeUsed: r.free_used };
+  try {
+    const res = await pool.query(
+      'SELECT credits, total, free_used FROM users WHERE chat_id = $1',
+      [String(chatId)]
+    );
+    if (!res.rows.length) return { credits: 0, total: 0, freeUsed: false };
+    const r = res.rows[0];
+    return { credits: r.credits, total: r.total, freeUsed: r.free_used };
+  } catch (err) {
+    // Table жоқ болса немесе DB қате берсе — freeUsed:true қайтар (сақтық шара)
+    console.error('[DB] getUser error:', err.message);
+    return { credits: 0, total: 0, freeUsed: true };
+  }
 }
 
 async function addCredits(chatId, amount) {
