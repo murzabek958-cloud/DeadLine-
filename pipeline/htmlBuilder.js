@@ -171,9 +171,16 @@ function renderBullets(slide, palette, accent, grid) {
 }
 function renderStats(slide, palette, accent) {
   if (!slide.stats || !slide.stats.length) return '';
+  const count = slide.stats.length;
+  const useGrid = count >= 4;
   const cards = slide.stats.map(function(s) {
-    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:28px 36px;text-align:center;flex:1;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:46px;font-weight:700;color:' + accent + ';line-height:1;margin-bottom:10px;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:' + palette.muted + ';">' + s.label + '</div></div>';
+    const padding = useGrid ? '20px 24px' : '28px 36px';
+    const fontSize = useGrid ? '38px' : '46px';
+    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:10px;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;">' + s.label + '</div></div>';
   }).join('');
+  if (useGrid) {
+    return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;">' + cards + '</div>';
+  }
   return '<div style="display:flex;gap:24px;width:100%;">' + cards + '</div>';
 }
 
@@ -256,4 +263,4 @@ function buildSlideHTML(slide, imageUrl) {
 }
 
 module.exports = { buildSlideHTML };
-    
+      
