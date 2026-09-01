@@ -125,7 +125,9 @@ function buildFallbackVisual(accent, mood, index) {
       <circle cx="280" cy="280" r="54" stroke="${a2}" stroke-width="1" fill="none"/>
       <circle cx="280" cy="280" r="75" stroke="${a3}" stroke-width="1" fill="none"/>
     </svg>`,
-// 1 — Geometric prism (геометриялық призма)
+      </svg>`,
+
+    // 1 — Geometric prism (геометриялық призма)
     `<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg"
         style="position:absolute; right:-20px; top:20px; z-index:1; opacity:0.8;">
       <defs>
@@ -161,7 +163,7 @@ function buildFallbackVisual(accent, mood, index) {
       <circle cx="104" cy="350" r="5" fill="${a}" opacity="0.9"/>
       <circle cx="104" cy="170" r="5" fill="${a}" opacity="0.9"/>
     </svg>`,
-    
+
     // 2 — Data flow (деректер ағымы)
     `<svg width="540" height="540" viewBox="0 0 540 540" fill="none" xmlns="http://www.w3.org/2000/svg"
         style="position:absolute; right:-30px; top:30px; z-index:1; opacity:0.8;">
@@ -225,7 +227,7 @@ function buildFallbackVisual(accent, mood, index) {
       <polyline points="87,160 167,100 247,200 327,80 407,130"
         stroke="${a1}" stroke-width="2" fill="none" stroke-dasharray="6 3"/>
     </svg>`,
-
+    
     // 4 — Abstract circles (абстрактты шеңберлер)
     `<svg width="560" height="560" viewBox="0 0 560 560" fill="none" xmlns="http://www.w3.org/2000/svg"
         style="position:absolute; right:-50px; top:-30px; z-index:1; opacity:0.75;">
@@ -449,7 +451,8 @@ function buildSlideHTML(slide, imageUrl) {
   const textCSS    = textPositionCSS(safeTextPos, imageType);
 
   // Сурет жоқ болғанда: SVG fallback + gradient bg
-  const hasFallbackVisual = !img;
+  const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
+  const hasFallbackVisual = !img && !hasRichContent;
   const fallbackSVG = hasFallbackVisual ? buildFallbackVisual(accent, mood, idx) : '';
 
   const bgLayer = wrapperCSS
