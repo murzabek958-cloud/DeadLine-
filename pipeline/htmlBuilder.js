@@ -218,6 +218,73 @@ function sanitizeComposition(imageType, overlayType, img) {
   return safeOverlay;
 }
 
+// right_half/left_half слайдтарда бос жақта SVG визуал шығару
+function buildSplitFallbackSVG(accent, side, index) {
+  const a  = accent || '#d4a843';
+  const a2 = a + '55';
+  const a3 = a + '22';
+  const a4 = a + '11';
+  const pos = side === 'right' ? 'right:0;' : 'left:0;';
+  const v = index % 3;
+
+  let svg = '';
+  if (v === 0) {
+    svg = '<svg width="580" height="720" viewBox="0 0 580 720" fill="none" xmlns="http://www.w3.org/2000/svg">'
+      + '<circle cx="290" cy="360" r="280" fill="' + a4 + '"/>'
+      + '<circle cx="290" cy="360" r="200" stroke="' + a3 + '" stroke-width="1" fill="none"/>'
+      + '<circle cx="290" cy="360" r="130" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
+      + '<circle cx="290" cy="360" r="70"  stroke="' + a2 + '" stroke-width="1.5" fill="' + a3 + '"/>'
+      + '<circle cx="290" cy="360" r="28"  fill="' + a + '" opacity="0.7"/>'
+      + '<line x1="290" y1="360" x2="120" y2="180" stroke="' + a2 + '" stroke-width="1"/>'
+      + '<line x1="290" y1="360" x2="460" y2="170" stroke="' + a2 + '" stroke-width="1"/>'
+      + '<line x1="290" y1="360" x2="490" y2="420" stroke="' + a2 + '" stroke-width="1"/>'
+      + '<line x1="290" y1="360" x2="380" y2="570" stroke="' + a2 + '" stroke-width="1"/>'
+      + '<line x1="290" y1="360" x2="100" y2="520" stroke="' + a2 + '" stroke-width="1"/>'
+      + '<circle cx="120" cy="180" r="10" fill="' + a + '" opacity="0.7"/>'
+      + '<circle cx="460" cy="170" r="8"  fill="' + a + '" opacity="0.6"/>'
+      + '<circle cx="490" cy="420" r="12" fill="' + a + '" opacity="0.8"/>'
+      + '<circle cx="380" cy="570" r="9"  fill="' + a + '" opacity="0.65"/>'
+      + '<circle cx="100" cy="520" r="11" fill="' + a + '" opacity="0.7"/>'
+      + '<circle cx="120" cy="180" r="22" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
+      + '<circle cx="490" cy="420" r="26" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
+      + '</svg>';
+  } else if (v === 1) {
+    svg = '<svg width="580" height="720" viewBox="0 0 580 720" fill="none" xmlns="http://www.w3.org/2000/svg">'
+      + '<circle cx="290" cy="360" r="270" fill="' + a4 + '"/>'
+      + '<polygon points="290,100 490,220 490,500 290,620 90,500 90,220" stroke="' + a2 + '" stroke-width="1.5" fill="' + a4 + '"/>'
+      + '<polygon points="290,180 420,255 420,465 290,540 160,465 160,255" stroke="' + a3 + '" stroke-width="1" fill="' + a3 + '"/>'
+      + '<polygon points="290,270 360,312 360,408 290,450 220,408 220,312" fill="' + a + '" opacity="0.4"/>'
+      + '<circle cx="290" cy="100" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="490" cy="220" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="490" cy="500" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="290" cy="620" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="90"  cy="500" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="90"  cy="220" r="6" fill="' + a + '" opacity="0.9"/>'
+      + '<circle cx="290" cy="360" r="30" fill="' + a + '" opacity="0.6"/>'
+      + '<circle cx="290" cy="360" r="48" stroke="' + a2 + '" stroke-width="1.5" fill="none"/>'
+      + '</svg>';
+  } else {
+    svg = '<svg width="580" height="720" viewBox="0 0 580 720" fill="none" xmlns="http://www.w3.org/2000/svg">'
+      + '<ellipse cx="290" cy="360" rx="250" ry="100" stroke="' + a2 + '" stroke-width="1" fill="none" transform="rotate(-20 290 360)"/>'
+      + '<ellipse cx="290" cy="360" rx="250" ry="100" stroke="' + a2 + '" stroke-width="1" fill="none" transform="rotate(20 290 360)"/>'
+      + '<ellipse cx="290" cy="360" rx="250" ry="100" stroke="' + a2 + '" stroke-width="1" fill="none" transform="rotate(80 290 360)"/>'
+      + '<circle cx="290" cy="360" r="240" fill="' + a4 + '"/>'
+      + '<circle cx="540" cy="360" r="9"  fill="' + a + '" opacity="0.8"/>'
+      + '<circle cx="40"  cy="360" r="7"  fill="' + a + '" opacity="0.6"/>'
+      + '<circle cx="420" cy="120" r="8"  fill="' + a + '" opacity="0.7"/>'
+      + '<circle cx="160" cy="600" r="6"  fill="' + a + '" opacity="0.55"/>'
+      + '<circle cx="420" cy="600" r="10" fill="' + a + '" opacity="0.75"/>'
+      + '<circle cx="160" cy="120" r="7"  fill="' + a + '" opacity="0.6"/>'
+      + '<circle cx="290" cy="360" r="45" fill="' + a + '" opacity="0.15"/>'
+      + '<circle cx="290" cy="360" r="26" fill="' + a + '" opacity="0.8"/>'
+      + '<circle cx="290" cy="360" r="62" stroke="' + a2 + '" stroke-width="1.5" fill="none"/>'
+      + '<circle cx="290" cy="360" r="85" stroke="' + a3 + '" stroke-width="1" fill="none"/>'
+      + '</svg>';
+  }
+
+  return '<div style="position:absolute;top:0;' + pos + 'width:52%;height:100%;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">' + svg + '</div>';
+}
+
 function buildSlideHTML(slide, imageUrl) {
   const comp        = slide.composition || {};
   const imageType   = comp.image        || 'none';
@@ -241,7 +308,13 @@ function buildSlideHTML(slide, imageUrl) {
 
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
   const showFallback   = !img && !hasRichContent;
-  const fallbackSVG    = showFallback ? buildFallbackVisual(accent, mood, idx) : '';
+
+  // right_half / left_half + сурет жоқ → бос жаққа SVG визуал
+  const isSplit = imageType === 'right_half' || imageType === 'left_half';
+  const splitSide = imageType === 'right_half' ? 'right' : 'left';
+  const splitFallbackSVG = !img && isSplit ? buildSplitFallbackSVG(accent, splitSide, idx) : '';
+
+  const fallbackSVG = showFallback && !isSplit ? buildFallbackVisual(accent, mood, idx) : '';
 
   const bgLayer = wrapperCSS
     ? '<div style="' + wrapperCSS + '"></div>'
@@ -256,6 +329,7 @@ function buildSlideHTML(slide, imageUrl) {
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;background:' + palette.bg + ';font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;}</style></head><body><div class="slide">'
     + bgLayer
     + fallbackSVG
+    + splitFallbackSVG
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
     + decorHTML
     + '<div style="' + textCSS + '">' + contentHTML + '</div>'
@@ -263,4 +337,3 @@ function buildSlideHTML(slide, imageUrl) {
 }
 
 module.exports = { buildSlideHTML };
-      
