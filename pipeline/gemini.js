@@ -114,7 +114,7 @@ function styleGuide(style) {
 
 // ─── 1. Generate ──────────────────────────────────────────────────────────
 async function generateSlides(topic, options = {}) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
   const slideCount = options.slideCount || null;
   const language   = options.language   || null;
