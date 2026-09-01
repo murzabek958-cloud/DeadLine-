@@ -5,7 +5,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const fs          = require('fs');
 const { generatePresentation }          = require('./index');
-const { getUser, addCredits, useCredit, setFreeUsed } = require('./db');
+const { initDB, getUser, addCredits, useCredit, setFreeUsed } = require('./db');
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 
@@ -259,5 +259,7 @@ async function makePresentaton(chatId, topic, isFree) {
   }
 }
 
-console.log('[Bot] Іске қосылды. Хабарлар күтілуде...');
+initDB()
+  .then(() => console.log('[Bot] Іске қосылды. Хабарлар күтілуде...'))
+  .catch(err => { console.error('[DB] Init error:', err); process.exit(1); });
     
