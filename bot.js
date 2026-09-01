@@ -129,11 +129,11 @@ bot.on('message', async (msg) => {
 
   if (!text) return;
 
-  const user = getUser(chatId);
-
-  // ── Сан күтіп тұрмыз ба — төлем ақпараты──────────────────────────────────
+  // ── Сан күтіп тұрмыз ба — БІРІНШІ тексер ───────────────────────────────
+  // Бұл тексерісті user алдына қою маңызды!
   if (waitingForCount.has(chatId)) {
     const count = parseInt(text.trim(), 10);
+    // Сан емес мәтін жазса — тақырып ретінде қабылдама, қайта сұра
 
     if (isNaN(count) || count < 1 || count > 50) {
       return bot.sendMessage(chatId, '❗ 1-ден 50-ге дейін сан жазыңыз.');
@@ -141,6 +141,7 @@ bot.on('message', async (msg) => {
 
     waitingForCount.delete(chatId);
     const total = count * PRICE;
+    // user осында керек емес, жалғастырамыз
 
     return bot.sendMessage(
       chatId,
@@ -153,6 +154,9 @@ bot.on('message', async (msg) => {
       { parse_mode: 'Markdown' }
     );
   }
+
+  // ── Пайдаланушы мәліметін алу ───────────────────────────────────────────
+  const user = getUser(chatId);
 
   // ── Тегін презентация бар ─────────────────────────────────────────────────
   if (!user.freeUsed) {
@@ -256,3 +260,4 @@ async function makePresentaton(chatId, topic, isFree) {
 }
 
 console.log('[Bot] Іске қосылды. Хабарлар күтілуде...');
+    
