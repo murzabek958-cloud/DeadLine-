@@ -232,7 +232,7 @@ Middle slides: mix freely.
 
 // ─── 2. Review & Improve ──────────────────────────────────────────────────
 async function reviewAndImproveSlides(presentation) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
   const presentationJSON = JSON.stringify(presentation, null, 2);
 
   const prompt = `
