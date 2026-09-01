@@ -4,7 +4,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ─── Shared JSON parser (used by both functions) ───────────────────────────
+// ─── Shared JSON parser ────────────────────────────────────────────────────
 function parseGeminiJSON(text) {
   try {
     return JSON.parse(text);
@@ -15,15 +15,127 @@ function parseGeminiJSON(text) {
   }
 }
 
+// ─── Параметрлерді парсинг ─────────────────────────────────────────────────
+// "Жасанды интеллект, 10 слайд, орысша, бизнес стиль"
+// → { topic, slideCount, language, style }
+
+function parseUserInput(input) {
+  const parts = input.split(',').map(s => s.trim());
+  const topic = parts[0];
+
+  let slideCount = null;
+  let language   = null;
+  let style      = null;
+
+  for (const part of parts.slice(1)) {
+    const lower = part.toLowerCase();
+
+    // Слайд саны
+    const numMatch = lower.match(/(\d+)\s*(слайд|slide|бет|страниц)/);
+    if (numMatch) {
+      slideCount = Math.min(Math.max(parseInt(numMatch[1]), 5), 15);
+      continue;
+    }
+
+    // Тіл
+    if (lower.includes('қаз') || lower.includes('каз') || lower.includes('kazakh')) {
+      language = 'Kazakh'; continue;
+    }
+    if (lower.includes('орыс') || lower.includes('рус') || lower.includes('russian')) {
+      language = 'Russian'; continue;
+    }
+    if (lower.includes('ағыл') || lower.includes('англ') || lower.includes('english')) {
+      language = 'English'; continue;
+    }
+
+    // Стиль
+    if (lower.includes('бизнес') || lower.includes('корпор') || lower.includes('business')) {
+      style = 'business'; continue;
+    }
+    if (lower.includes('минимал') || lower.includes('minimal')) {
+      style = 'minimal'; continue;
+    }
+    if (lower.includes('креатив') || lower.includes('creative') || lower.includes('яркий') || lower.includes('жарқын')) {
+      style = 'creative'; continue;
+    }
+    if (lower.includes('академ') || lower.includes('ғылым') || lower.includes('научн')) {
+      style = 'academic'; continue;
+    }
+    if (lower.includes('презент') || lower.includes('питч') || lower.includes('pitch')) {
+      style = 'pitch'; continue;
+    }
+  }
+
+  return { topic, slideCount, language, style };
+}
+
+// ─── Стиль нұсқаулары ─────────────────────────────────────────────────────
+function styleGuide(style) {
+  switch (style) {
+    case 'business':
+      return `STYLE: Corporate business presentation.
+- Dark or cold mood dominant. Accent colors: deep blue, charcoal, white.
+- Clean typography, no decorative excess.
+- Stat cards and data-driven slides preferred.
+- Professional, confident tone.`;
+
+    case 'minimal':
+      return `STYLE: Minimalist presentation.
+- Light mood preferred. Maximum whitespace.
+- Only 2-3 elements per slide. No decorative clutter.
+- Thin accent lines only. No corner circles or grid dots.
+- Short, punchy text. Typography-focused.`;
+
+    case 'creative':
+      return `STYLE: Creative / bold presentation.
+- Vivid or warm mood. Bold accent colors: electric blue, magenta, gold.
+- Mix layouts freely. Use grid_dots, corner_circle generously.
+- Expressive typography. Variety is key — no two slides alike.
+- Energy and personality in every slide.`;
+
+    case 'academic':
+      return `STYLE: Academic / scientific presentation.
+- Cold or dark mood. Blue and teal accent tones.
+- Data-heavy: prefer stat cards, bullet lists over decorative elements.
+- Precise, factual language. No fluff.
+- Citations and structured content preferred.`;
+
+    case 'pitch':
+      return `STYLE: Startup pitch deck.
+- Dark vivid mood. Bold accent: electric blue, neon green, gold.
+- Cover slide must be stunning. Stats slides must be impactful.
+- Short punchy text. Every slide answers: "So what?"
+- Problem → Solution → Market → Traction → Ask structure preferred.`;
+
+    default:
+      return `STYLE: Professional mixed presentation. Balance between visual variety and content clarity.`;
+  }
+}
+
 // ─── 1. Generate ──────────────────────────────────────────────────────────
-async function generateSlides(topic) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+async function generateSlides(topic, options = {}) {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+  const slideCount = options.slideCount || null;
+  const language   = options.language   || null;
+  const style      = options.style      || null;
+
+  const slideCountRule = slideCount
+    ? `Generate EXACTLY ${slideCount} slides — no more, no less.`
+    : `Generate 7 to 10 slides.`;
+
+  const languageRule = language
+    ? `Write ALL text content in ${language}. Title, subtitle, body, bullets — everything in ${language}.`
+    : `Write content in the same language as the topic.`;
+
+  const styleSection = styleGuide(style);
 
   const prompt = `
 You are a professional presentation designer and art director.
 Create a compelling presentation on: "${topic}".
 
-Generate 7 to 10 slides. Each slide must feel visually distinct — like a real designer made each one individually.
+${slideCountRule}
+Each slide must feel visually distinct — like a real designer made each one individually.
 
 Respond ONLY with valid JSON. No markdown, no explanation, no code blocks.
 
@@ -53,144 +165,64 @@ Return this structure:
   ]
 }
 
-─── FIELD RULES ───────────────────────────────────────────
+─── STYLE DIRECTIVE ───────────────────────────────────────────
+${styleSection}
+
+─── LANGUAGE DIRECTIVE ────────────────────────────────────────
+${languageRule}
+Only include fields that have actual content — set unused fields to null.
+
+─── FIELD RULES ───────────────────────────────────────────────
 
 imageQuery:
-  - English only
+  - English only (regardless of content language)
   - Specific, photographic, descriptive
   - Include scene, mood, lighting
   - Good: "ancient Silk Road caravan crossing Central Asian steppe at golden hour cinematic"
   - Bad: "Kazakhstan history"
 
-composition.image — how the photo is placed:
-  "full_background"     image covers the entire slide
-  "right_half"          image occupies the right 50% of the slide
-  "left_half"           image occupies the left 45% of the slide
-  "top_strip"           image is a horizontal band at the top (~35% height)
-  "bottom_strip"        image is a horizontal band at the bottom
-  "corner_accent"       small image in one corner (specify which in decorative)
-  "none"                no image, solid color background
+composition.image:
+  "full_background"  "right_half"  "left_half"
+  "top_strip"        "bottom_strip"  "corner_accent"  "none"
 
-composition.overlay — gradient or color over the image:
-  "none"
-  "dark_gradient_left"       dark on left, transparent right
-  "dark_gradient_right"      dark on right, transparent left
-  "dark_gradient_bottom"     transparent top, dark bottom
-  "dark_full"                uniform dark over entire image
-  "light_full"               light wash over image
-  "color_wash"               accentColor at low opacity over image
+composition.overlay:
+  "none"  "dark_gradient_left"  "dark_gradient_right"
+  "dark_gradient_bottom"  "dark_full"  "light_full"  "color_wash"
 
-composition.textPosition — where the text block sits:
-  "center"
-  "center_left"
-  "center_right"
-  "top_left"
-  "top_center"
-  "bottom_left"
-  "bottom_center"
-  "left_column"              text in left column (used with right_half image)
-  "right_column"             text in right column (used with left_half image)
+composition.textPosition:
+  "center"  "center_left"  "center_right"
+  "top_left"  "top_center"  "bottom_left"  "bottom_center"
+  "left_column"  "right_column"
 
-composition.layout — internal text arrangement:
-  "single_column"
-  "two_column_bullets"       bullets split into 2 columns
-  "stat_cards_row"           stat cards in a horizontal row
-  "stat_cards_grid"          stat cards in a 2x2 grid
+composition.layout:
+  "single_column"  "two_column_bullets"  "stat_cards_row"  "stat_cards_grid"
 
 composition.mood:
-  "dark"     dark background, light text
-  "light"    light background, dark text
-  "warm"     warm tones (browns, golds)
-  "cold"     cool tones (blues, grays)
-  "vivid"    saturated accent color dominant
+  "dark"  "light"  "warm"  "cold"  "vivid"
 
-composition.accentColor:
-  A hex color that fits the slide's mood and topic.
-  Vary this across slides — not the same color every time.
+composition.elements (only include what exists):
+  "eyebrow"  "title"  "subtitle"  "divider"
+  "body"  "bullets"  "stats"  "quote_mark"
 
-composition.elements — what content to render (only include what exists):
-  "eyebrow"      small uppercase label above title
-  "title"        main heading
-  "subtitle"     secondary heading
-  "divider"      horizontal rule between elements
-  "body"         paragraph text
-  "bullets"      bullet list
-  "stats"        stat cards
-  "quote_mark"   large decorative quotation mark
+composition.decorative (optional):
+  "accent_line_left"  "accent_line_right"
+  "corner_circle"  "bottom_rule"  "grid_dots"
 
-composition.decorative — purely visual elements (optional):
-  "accent_line_left"     vertical colored line on left edge
-  "accent_line_right"    vertical colored line on right edge
-  "corner_circle"        decorative circle in corner
-  "bottom_rule"          thin line at bottom
-  "grid_dots"            subtle dot grid background texture
-
-─── COMPOSITION VARIETY RULES ─────────────────────────────
+─── COMPOSITION RULES ─────────────────────────────────────────
 
 Every slide must have a different composition from the others.
-Vary: image placement, overlay type, text position, mood, accent color.
-
-Slide 1 is always the cover: full_background image, strong overlay, large title.
+Slide 1 is always the cover: full_background, strong overlay, large title.
 Last slide is always closing: full_background, centered, minimal text.
-Middle slides: mix freely — split layouts, top strips, stat cards, columns, etc.
+Middle slides: mix freely.
 
-─── CONTENT RULES ─────────────────────────────────────────
+─── QUALITY RULES ─────────────────────────────────────────────
 
-Write content in the same language as the topic.
-Only include fields that have actual content — set unused fields to null.
-
-─── FINAL ART-DIRECTOR QA ────────────────────────────────────────
-
-Before returning the JSON, review the complete presentation as if you
-were looking at the rendered slides.
-
-For EVERY slide:
-- Keep generous empty space.
-- Never overcrowd the slide.
-- Never allow title, subtitle, body, bullets or stats to overlap.
-- Do not put text over important parts of an image.
+- Keep generous empty space. Never overcrowd.
 - Match textPosition with image placement.
-- Keep title hierarchy strong and readable.
-- Titles should normally use strong weight; body and bullets should remain
-  normal weight.
-- Use typography that supports Kazakh and Russian Cyrillic.
-- Prefer readable Noto Sans / DejaVu Sans compatible typography.
-- Do not make every text element bold.
-- Shorten content when necessary instead of creating a crowded slide.
-
-VISUAL COMPOSITION:
-- Decorative elements are NOT only for image fallbacks.
-- Use decorative elements on normal slides when they improve composition.
-- Usually use 1–3 meaningful decorative elements.
-- Vary decorative elements between slides.
-- Use accent lines, circles, bottom rules and grid dots strategically.
-- Do not repeat the exact same visual treatment on every slide.
-- Preserve intentional empty space.
-
-VISUALIZATION:
-- When the topic contains a process, comparison, structure, timeline,
-  relationship, statistics or other visual concept, prefer a visual
-  composition instead of presenting everything as plain text.
-- Use shapes, visual groupings, arrows, cards or other available visual
-  structures when appropriate.
-- Do not rely only on photographs.
-
-IMAGE FALLBACK:
-- If imageQuery is null or no image is found, the slide must still look
-  intentionally designed.
-- Use decorative visual elements and balanced empty space.
-- Never let a missing image produce a visually empty slide.
-
-FINAL CHECK:
-Before returning JSON, mentally inspect every slide for:
-readability, hierarchy, spacing, visual balance, image/text balance,
-Cyrillic readability, overcrowding and visual variety.
-
-If a slide fails the check, revise its content or composition before
-returning JSON.
-
-bullets: max 6 items. stats: max 4 items.
-body: 1–3 sentences maximum.
+- imageQuery must always be in English.
+- bullets: max 6. stats: max 4. body: 1–3 sentences.
+- Vary accent colors across slides.
+- Mentally check every slide before returning JSON.
 `;
 
   const result = await model.generateContent(prompt);
@@ -200,8 +232,7 @@ body: 1–3 sentences maximum.
 
 // ─── 2. Review & Improve ──────────────────────────────────────────────────
 async function reviewAndImproveSlides(presentation) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const presentationJSON = JSON.stringify(presentation, null, 2);
 
   const prompt = `
@@ -218,86 +249,46 @@ ${presentationJSON}
 
 ─── REVIEW CRITERIA ──────────────────────────────────────────────────────────
 
-For each slide, mentally render it at 1280×720 and check:
-
 READABILITY
 - Is text readable over the image? If not, fix overlay or textPosition.
 - Is the title too long (>8 words)? Shorten it if yes.
-- Is Cyrillic text natural and concise?
-- If image="full_background" and overlay="dark_gradient_left" or "dark_gradient_right":
-  the text MUST be positioned on the dark side (center_left for left gradient,
-  center_right for right gradient). If textPosition is on the bright side — FIX IT.
+- If image="full_background" and overlay="dark_gradient_left": textPosition must be center_left.
+- If image="full_background" and overlay="dark_gradient_right": textPosition must be center_right.
 
 OVERFLOW / DENSITY
-- Does the text block overflow its card or frame? If yes, cut content.
-- Are there too many bullets (>6) or body sentences (>3)? Trim.
-- Are there too many visual elements on one slide? Remove the least important.
+- Does the text block overflow? Cut content.
+- Too many bullets (>6) or body sentences (>3)? Trim.
 
 COLLISION / PLACEMENT
-- Does textPosition conflict with image placement?
-  (e.g. left_column with full_background and no left overlay — fix overlay or textPosition)
-- Does text land over the important subject of the image? Fix textPosition or composition.image.
+- Does textPosition conflict with image placement? Fix it.
+- Does text land over important image subjects? Fix textPosition.
 
-KNOWN BAD PATTERNS — automatically fix these:
-
-  1. image="top_strip" + textPosition="bottom_center":
-     The image occupies the top 38% of the slide. The bottom 62% is a large
-     empty area with text stuck at the very bottom. This looks unbalanced.
-     FIX: change textPosition to "center" so text sits in the middle of
-     the empty lower area, or change image to "right_half" for a better split.
-
-  2. image="full_background" + overlay="dark_gradient_left" + many text elements:
-     If subtitle + body + bullets are all present, the text block is too tall
-     for the dark gradient zone and the bottom lines lose contrast.
-     FIX: remove body or merge it into subtitle, keep ≤2 content elements below title.
-
-  3. image="full_background" + textPosition="bottom_center":
-     The bottom of the image often contains important foreground subjects
-     (hands, people, objects). Text at bottom_center lands directly on them.
-     FIX: change textPosition to "center" and ensure overlay covers the center zone.
-     Add "dark_gradient_bottom" or "dark_full" overlay if not already present.
-
-  4. imageQuery is conceptually mismatched with the slide topic:
-     (e.g. "cyberpunk city streets" for a slide about AI ethics and privacy laws)
-     FIX: rewrite imageQuery to match the actual topic.
-     Good: "surveillance camera network city security abstract blue cinematic"
-     Bad:  "neon city street rain cyberpunk"
+KNOWN BAD PATTERNS — fix automatically:
+  1. top_strip + bottom_center → change textPosition to "center"
+  2. full_background + dark_gradient_left + subtitle+body+bullets → remove body
+  3. full_background + bottom_center → change to "center" + add overlay
+  4. imageQuery mismatched with topic → rewrite imageQuery
+  5. full_background + overlay=none + image present → add "dark_gradient_bottom"
 
 CONTRAST
-- Is contrast sufficient for the mood? If mood is "light" but overlay is "dark_full", fix.
-- If text is light and background is also light, fix overlay or mood.
-- If image="full_background" and overlay="none" and image is present — this is dangerous.
-  FIX: add at minimum "dark_gradient_bottom" overlay.
+- Light text on light background → fix overlay or mood.
 
 COMPOSITION
-- Does the slide preserve empty space? If everything is filled, remove an element.
-- Are adjacent slides too similar (same image type + same textPosition + same overlay)?
-  If yes, change at least one composition property on one of them.
+- Preserve empty space. Adjacent slides too similar → vary one property.
 
 IMAGE QUERY
-- Is imageQuery specific and descriptive (scene + mood + lighting)?
-- If it's vague (e.g. "Kazakhstan history"), rewrite it.
-- imageQuery must be in English only.
-- imageQuery must describe a real photograph, not an illustration or concept.
-  Good: "glowing neural network visualization dark background blue particles cinematic"
-  Bad:  "artificial intelligence concept"
+- Must be English, specific, photographic (scene + mood + lighting).
+- Vague query → rewrite.
 
-─── RULES ────────────────────────────────────────────────────────────────────
-
+─── RULES ──────────────────────────────────────────────────────────────────
 - Do NOT change slides that pass all checks.
-- Only modify slides that have real problems.
 - Preserve original text as much as possible.
-- Only change title / body / bullets / composition / imageQuery if necessary.
-- Do NOT return HTML, CSS, or SVG — JSON only.
-- Do NOT redesign slides that are already visually solid.
+- Do NOT return HTML, CSS, or SVG.
 - Keep the same number of slides.
 
-─── OUTPUT ───────────────────────────────────────────────────────────────────
-
-Respond ONLY with valid JSON in the exact same schema as the input.
-No markdown, no explanation, no code blocks.
-
-Return the full presentation object with all slides, modified or not.
+─── OUTPUT ─────────────────────────────────────────────────────────────────
+Respond ONLY with valid JSON. No markdown. No explanation.
+Return the full presentation object with all slides.
 `;
 
   const result = await model.generateContent(prompt);
@@ -306,23 +297,17 @@ Return the full presentation object with all slides, modified or not.
   let reviewed;
   try {
     reviewed = parseGeminiJSON(text);
-  } catch (err) {
-    // Fallback: if review JSON is broken, return original untouched
-    console.warn('[Review] Gemini returned invalid JSON — skipping review, using original.');
+  } catch {
+    console.warn('[Review] Invalid JSON — using original.');
     return presentation;
   }
 
-  // Sanity check: reviewed must have same slide count
-  if (
-    !reviewed ||
-    !Array.isArray(reviewed.slides) ||
-    reviewed.slides.length !== presentation.slides.length
-  ) {
-    console.warn('[Review] Slide count mismatch or missing slides — skipping review, using original.');
+  if (!reviewed?.slides || reviewed.slides.length !== presentation.slides.length) {
+    console.warn('[Review] Slide count mismatch — using original.');
     return presentation;
   }
 
   return reviewed;
 }
 
-module.exports = { generateSlides, reviewAndImproveSlides };
+module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
