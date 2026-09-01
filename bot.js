@@ -4,28 +4,23 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const fs          = require('fs');
-const { generatePresentation }          = require('./index');
+const { generatePresentation }                              = require('./index');
 const { initDB, getUser, addCredits, useCredit, setFreeUsed } = require('./db');
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
-// ─── Конфиг ────────────────────────────────────────────────────────────────
 const KASPI_PHONE = '+77713436592';
 const KASPI_NAME  = 'Мурзабек Н';
-const PRICE       = 250; // ₸ за 1 през
+const PRICE       = 250;
 const ADMIN_ID    = process.env.ADMIN_CHAT_ID;
 
-// Қазір жасалып жатқандар (spam болдырмау)
-const processing = new Set();
-
-// Пайдаланушы жағдайы: сан күтіп тұрмыз ба
+const processing     = new Set();
 const waitingForCount = new Set();
 
 // ─── /start ────────────────────────────────────────────────────────────────
-bot.onText(/\/start/, (msg) => {
-  const user = getUser(msg.chat.id);
+bot.onText(/\/start/, async (msg) => {
+  const user    = await getUser(msg.chat.id);
   const hasFree = !user.freeUsed;
-
   bot.sendMessage(
     msg.chat.id,
     '👋 Сәлем! Мен кәсіби презентация жасайтын ботпын.\n\n' +
@@ -37,8 +32,8 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ─── /balance ──────────────────────────────────────────────────────────────
-bot.onText(/\/balance/, (msg) => {
-  const user = getUser(msg.chat.id);
+bot.onText(/\/balance/, async (msg) => {
+  const user = await getUser(msg.chat.id);
   bot.sendMessage(
     msg.chat.id,
     `💳 Сізде *${user.credits}* презентация кредиті бар.`,
@@ -71,7 +66,7 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
     return bot.sendMessage(msg.chat.id, '❌ Дұрыс сан жазыңыз.');
   }
 
-  const user = addCredits(targetId, amount);
+  const user = await addCredits(targetId, amount);
 
   await bot.sendMessage(
     targetId,
@@ -81,10 +76,7 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
     { parse_mode: 'Markdown' }
   );
 
-  bot.sendMessage(
-    msg.chat.id,
-    `✅ ${targetId} → +${amount} кредит. Жиыны: ${user.total}.`
-  );
+  bot.sendMessage(msg.chat.id, `✅ ${targetId} → +${amount} кредит. Жиыны: ${user.total}.`);
 });
 
 // ─── Негізгі хабар обработчигі ─────────────────────────────────────────────
@@ -94,11 +86,10 @@ bot.on('message', async (msg) => {
 
   if (text && text.startsWith('/')) return;
 
-  // ── Чек (PDF) келсе ──────────────────────────────────────────────────────
+  // ── Чек (PDF) ────────────────────────────────────────────────────────────
   if (msg.document) {
     const fileName = (msg.document.file_name || '').toLowerCase();
-    const isPdf    = fileName.endsWith('.pdf') ||
-                     msg.document.mime_type === 'application/pdf';
+    const isPdf    = fileName.endsWith('.pdf') || msg.document.mime_type === 'application/pdf';
 
     if (!isPdf) {
       return bot.sendMessage(chatId, '📎 Kaspi чегін *PDF* түрінде жіберіңіз.', { parse_mode: 'Markdown' });
@@ -106,59 +97,44 @@ bot.on('message', async (msg) => {
 
     const userName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'Белгісіз';
 
-    // Adminге форвард
     await bot.forwardMessage(ADMIN_ID, chatId, msg.message_id);
     await bot.sendMessage(
       ADMIN_ID,
-      `📥 *Жаңа чек!*\n\n` +
-      `👤 ${userName}\n` +
-      `🆔 \`${chatId}\`\n\n` +
-      `Растау үшін:\n\`/confirm ${chatId} <сан>\`\n\n` +
-      `Мысалы 2 през үшін:\n\`/confirm ${chatId} 2\``,
+      `📥 *Жаңа чек!*\n\n👤 ${userName}\n🆔 \`${chatId}\`\n\n` +
+      `Растау үшін:\n\`/confirm ${chatId} <сан>\`\n\nМысалы 2 през үшін:\n\`/confirm ${chatId} 2\``,
       { parse_mode: 'Markdown' }
     );
 
     return bot.sendMessage(
       chatId,
-      '📨 Чегіңіз қабылданды!\n\n' +
-      '⏳ Растау *5-10 минут* ішінде болады.\n' +
-      'Расталған соң хабарлама аласыз.',
+      '📨 Чегіңіз қабылданды!\n\n⏳ Растау *5-10 минут* ішінде болады.\nРасталған соң хабарлама аласыз.',
       { parse_mode: 'Markdown' }
     );
   }
 
   if (!text) return;
 
-  // ── Сан күтіп тұрмыз ба — БІРІНШІ тексер ───────────────────────────────
-  // Бұл тексерісті user алдына қою маңызды!
+  // ── Сан күтіп тұрмыз ба — БІРІНШІ тексер ────────────────────────────────
   if (waitingForCount.has(chatId)) {
     const count = parseInt(text.trim(), 10);
-    // Сан емес мәтін жазса — тақырып ретінде қабылдама, қайта сұра
-
     if (isNaN(count) || count < 1 || count > 50) {
       return bot.sendMessage(chatId, '❗ 1-ден 50-ге дейін сан жазыңыз.');
     }
-
     waitingForCount.delete(chatId);
     const total = count * PRICE;
-    // user осында керек емес, жалғастырамыз
-
     return bot.sendMessage(
       chatId,
       `🧾 *${count} презентация — ${total}₸*\n\n` +
-      `💳 Kaspi арқылы төлеңіз:\n` +
-      `📱 *${KASPI_PHONE}*\n` +
-      `👤 ${KASPI_NAME}\n\n` +
-      `Сомасы: *${total}₸*\n\n` +
-      `Төлегеннен кейін *чекті (PDF)* осы ботқа жіберіңіз ✅`,
+      `💳 Kaspi арқылы төлеңіз:\n📱 *${KASPI_PHONE}*\n👤 ${KASPI_NAME}\n\n` +
+      `Сомасы: *${total}₸*\n\nТөлегеннен кейін *чекті (PDF)* осы ботқа жіберіңіз ✅`,
       { parse_mode: 'Markdown' }
     );
   }
 
-  // ── Пайдаланушы мәліметін алу ───────────────────────────────────────────
-  const user = getUser(chatId);
+  // ── Пайдаланушы мәліметін алу (await!) ───────────────────────────────────
+  const user = await getUser(chatId);
 
-  // ── Тегін презентация бар ─────────────────────────────────────────────────
+  // ── Тегін презентация бар ────────────────────────────────────────────────
   if (!user.freeUsed) {
     return makePresentaton(chatId, text, true);
   }
@@ -172,9 +148,7 @@ bot.on('message', async (msg) => {
   waitingForCount.add(chatId);
   return bot.sendMessage(
     chatId,
-    `💳 Сізде презентация кредиті жоқ.\n\n` +
-    `💰 Баға: *${PRICE}₸* — 1 презентация\n\n` +
-    `Неше презентация керек? Санын жазыңыз:`,
+    `💳 Сізде презентация кредиті жоқ.\n\n💰 Баға: *${PRICE}₸* — 1 презентация\n\nНеше презентация керек? Санын жазыңыз:`,
     { parse_mode: 'Markdown' }
   );
 });
@@ -187,21 +161,20 @@ async function makePresentaton(chatId, topic, isFree) {
 
   processing.add(chatId);
 
-  // Кредитті немесе тегін белгіні алдын-ала жұмса
   if (isFree) {
-    setFreeUsed(chatId);
+    await setFreeUsed(chatId);
   } else {
-    useCredit(chatId);
+    await useCredit(chatId);
   }
 
-  const remaining = getUser(chatId).credits;
+  const userAfter  = await getUser(chatId);
+  const remaining  = userAfter.credits;
   let statusMsg;
 
   try {
     statusMsg = await bot.sendMessage(
       chatId,
-      `⏳ Презентация жасалуда...\n\n` +
-      `📌 Тақырып: *${topic}*\n` +
+      `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${topic}*\n` +
       (isFree ? '🎁 Тегін презентация\n' : `💳 Қалған кредит: ${remaining}\n`) +
       `\n_1-2 минут күтіңіз..._`,
       { parse_mode: 'Markdown' }
@@ -210,8 +183,7 @@ async function makePresentaton(chatId, topic, isFree) {
     const { pptxPath, title } = await generatePresentation(topic);
 
     await bot.editMessageText('✅ Дайын! Жіберілуде...', {
-      chat_id: chatId,
-      message_id: statusMsg.message_id,
+      chat_id: chatId, message_id: statusMsg.message_id,
     });
 
     await bot.sendDocument(
@@ -232,23 +204,17 @@ async function makePresentaton(chatId, topic, isFree) {
   } catch (err) {
     console.error('[Bot] Error:', err.message);
 
-    // Кредитті қайтар
     if (isFree) {
-      const db = require('./db');
-      // freeUsed-ты қайтару — edge case, жай кредит беремін
-      addCredits(chatId, 1);
+      await addCredits(chatId, 1);
     } else {
-      addCredits(chatId, 1);
+      await addCredits(chatId, 1);
     }
 
-    const errText =
-      '❌ Қате орын алды, кредитіңіз қайтарылды.\n\n' +
-      'Тақырыпты қайта жіберіп көріңіз.';
+    const errText = '❌ Қате орын алды, кредитіңіз қайтарылды.\n\nТақырыпты қайта жіберіп көріңіз.';
 
     if (statusMsg) {
       await bot.editMessageText(errText, {
-        chat_id: chatId,
-        message_id: statusMsg.message_id,
+        chat_id: chatId, message_id: statusMsg.message_id,
       }).catch(() => bot.sendMessage(chatId, errText));
     } else {
       await bot.sendMessage(chatId, errText);
@@ -259,7 +225,14 @@ async function makePresentaton(chatId, topic, isFree) {
   }
 }
 
+// ─── Іске қосу ─────────────────────────────────────────────────────────────
 initDB()
-  .then(() => console.log('[Bot] Іске қосылды. Хабарлар күтілуде...'))
-  .catch(err => { console.error('[DB] Init error:', err); process.exit(1); });
+  .then(() => {
+    bot.startPolling();
+    console.log('[Bot] Іске қосылды. Хабарлар күтілуде...');
+  })
+  .catch(err => {
+    console.error('[DB] Init error:', err);
+    process.exit(1);
+  });
     
