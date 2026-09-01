@@ -5,7 +5,7 @@ const path_ = require('path');
 
 function getLogoBase64() {
   try {
-    const logoPath = path_.join(__dirname, 'assets', 'logo_white.png');
+    const logoPath = path_.join(__dirname, '..', 'assets', 'logo_white.png');
     const data = fs_.readFileSync(logoPath);
     return 'data:image/png;base64,' + data.toString('base64');
   } catch (e) {
@@ -62,7 +62,6 @@ function imagePlacement(imageType, img) {
       return { wrapperCSS: '' };
   }
 }
-
 function buildFallbackVisual(accent, mood, index) {
   const a  = accent || '#d4a843';
   const a1 = a + 'cc';
