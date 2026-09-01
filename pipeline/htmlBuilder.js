@@ -224,8 +224,10 @@ function buildSlideHTML(slide, imageUrl) {
   const idx         = (slide.index || 1) - 1;
 
   const palette    = MOOD[mood] || MOOD.dark;
-  const img        = imageUrl   || '';
-  const safeOverlay = sanitizeComposition(imageType, overlayType, img);
+  // Stat cards бар слайдта сурет керек емес — cards + image = толып кетеді
+  const hasStats = slide.stats && slide.stats.length > 0;
+  const img = imageUrl || '';
+  const safeOverlay = hasStats && img ? 'dark_full' : sanitizeComposition(imageType, overlayType, img);
   const { wrapperCSS } = imagePlacement(imageType, img);
   const hasOverlay = img && safeOverlay !== 'none';
   const textCSS    = textPositionCSS(textPos, imageType);
@@ -254,4 +256,4 @@ function buildSlideHTML(slide, imageUrl) {
 }
 
 module.exports = { buildSlideHTML };
-      
+    
