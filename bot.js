@@ -14,8 +14,21 @@ const KASPI_NAME  = 'Мурзабек Н';
 const PRICE       = 250;
 const ADMIN_ID    = process.env.ADMIN_CHAT_ID;
 
-const processing     = new Set();
+const processing      = new Set();
 const waitingForCount = new Set();
+
+// ─── Негізгі менюдің батырмалары ───────────────────────────────────────────
+const MAIN_KEYBOARD = {
+  reply_markup: {
+    keyboard: [
+      [{ text: '💳 Менің есепшотым' }, { text: '❓ Көмек' }],
+      [{ text: '💰 Кредит сатып алу' }],
+    ],
+    resize_keyboard: true,
+    persistent: true,
+  },
+  parse_mode: 'Markdown',
+};
 
 // ─── /start ────────────────────────────────────────────────────────────────
 bot.onText(/\/start/, async (msg) => {
@@ -26,34 +39,46 @@ bot.onText(/\/start/, async (msg) => {
     '👋 Сәлем! Мен кәсіби презентация жасайтын ботпын.\n\n' +
     (hasFree
       ? '🎁 Сізге *1 тегін презентация* бар!\n\nТақырыпты жазыңыз — бастаймыз.'
-      : `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\nНеше презентация керек екенін жазыңыз (мысалы: *2*)`),
-    { parse_mode: 'Markdown' }
+      : `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\nТақырыпты жазыңыз немесе кредит сатып алыңыз.`),
+    MAIN_KEYBOARD
   );
 });
 
-// ─── /balance ──────────────────────────────────────────────────────────────
-bot.onText(/\/balance/, async (msg) => {
-  const user = await getUser(msg.chat.id);
+// ─── /balance & "Менің есепшотым" батырмасы ───────────────────────────────
+bot.onText(/\/balance/, (msg) => showBalance(msg.chat.id));
+
+async function showBalance(chatId) {
+  const user = await getUser(chatId);
+  const freeStatus = user.freeUsed
+    ? '❌ Тегін презентация пайдаланылды'
+    : '🎁 Тегін презентация қол жетімді';
+
   bot.sendMessage(
-    msg.chat.id,
-    `💳 Сізде *${user.credits}* презентация кредиті бар.`,
-    { parse_mode: 'Markdown' }
+    chatId,
+    `📊 *Менің есепшотым*\n\n` +
+    `💳 Кредит: *${user.credits}* презентация\n` +
+    `📦 Жалпы сатып алынды: *${user.total}*\n` +
+    `${freeStatus}`,
+    { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
-});
+}
 
 // ─── /help ─────────────────────────────────────────────────────────────────
-bot.onText(/\/help/, (msg) => {
+bot.onText(/\/help/, (msg) => showHelp(msg.chat.id));
+
+function showHelp(chatId) {
   bot.sendMessage(
-    msg.chat.id,
+    chatId,
     '📖 *Қалай пайдалану:*\n\n' +
-    '1️⃣ Неше презентация керек екенін жазыңыз\n' +
-    '2️⃣ Kaspi арқылы төлеңіз\n' +
-    '3️⃣ Чекті (PDF) осы ботқа жіберіңіз\n' +
-    '4️⃣ Кредит расталған соң тақырыпты жазыңыз\n\n' +
+    '1️⃣ Тақырыпты жазыңыз (тегін 1 рет)\n' +
+    '2️⃣ Кредит сатып алу үшін «💰 Кредит сатып алу» басыңыз\n' +
+    '3️⃣ Kaspi арқылы төлеңіз\n' +
+    '4️⃣ Чекті (PDF) осы ботқа жіберіңіз\n' +
+    '5️⃣ Кредит расталған соң тақырыпты жазыңыз\n\n' +
     `📱 Kaspi: *${KASPI_PHONE}* (${KASPI_NAME})`,
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
-});
+}
 
 // ─── /confirm <chatId> <amount> — тек admin ────────────────────────────────
 bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
@@ -71,12 +96,13 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
   await bot.sendMessage(
     targetId,
     `✅ Төлем расталды!\n\n` +
-    `💳 *${amount}* презентация кредиті қосылды.\n\n` +
+    `💳 *${amount}* презентация кредиті қосылды.\n` +
+    `📦 Жалпы кредитіңіз: *${user.credits}*\n\n` +
     `Презентация тақырыбын жазыңыз — бастаймыз! 🚀`,
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
 
-  bot.sendMessage(msg.chat.id, `✅ ${targetId} → +${amount} кредит. Жиыны: ${user.total}.`);
+  bot.sendMessage(msg.chat.id, `✅ ${targetId} → +${amount} кредит. Қалған: ${user.credits}. Жиыны: ${user.total}.`);
 });
 
 // ─── Негізгі хабар обработчигі ─────────────────────────────────────────────
@@ -85,6 +111,26 @@ bot.on('message', async (msg) => {
   const text   = msg.text;
 
   if (text && text.startsWith('/')) return;
+
+  // ── Батырма: Менің есепшотым ─────────────────────────────────────────────
+  if (text === '💳 Менің есепшотым') {
+    return showBalance(chatId);
+  }
+
+  // ── Батырма: Көмек ────────────────────────────────────────────────────────
+  if (text === '❓ Көмек') {
+    return showHelp(chatId);
+  }
+
+  // ── Батырма: Кредит сатып алу ────────────────────────────────────────────
+  if (text === '💰 Кредит сатып алу') {
+    waitingForCount.add(chatId);
+    return bot.sendMessage(
+      chatId,
+      `💰 *Кредит сатып алу*\n\n💵 Баға: *${PRICE}₸* — 1 презентация\n\nНеше презентация керек? Санын жазыңыз:`,
+      { parse_mode: 'Markdown' }
+    );
+  }
 
   // ── Чек (PDF) ────────────────────────────────────────────────────────────
   if (msg.document) {
@@ -131,7 +177,7 @@ bot.on('message', async (msg) => {
     );
   }
 
-  // ── Пайдаланушы мәліметін алу (await!) ───────────────────────────────────
+  // ── Пайдаланушы мәліметін алу ───────────────────────────────────────────
   const user = await getUser(chatId);
 
   // ── Тегін презентация бар ────────────────────────────────────────────────
@@ -167,8 +213,8 @@ async function makePresentaton(chatId, topic, isFree) {
     await useCredit(chatId);
   }
 
-  const userAfter  = await getUser(chatId);
-  const remaining  = userAfter.credits;
+  const userAfter = await getUser(chatId);
+  const remaining = userAfter.credits;
   let statusMsg;
 
   try {
@@ -193,7 +239,7 @@ async function makePresentaton(chatId, topic, isFree) {
         caption:
           `📊 *${title}*\n\n` +
           (isFree
-            ? `🎁 Тегін презентацияңыз дайын!\n\n💳 Келесі презентация үшін: *${PRICE}₸*\nНеше керек екенін жазыңыз.`
+            ? `🎁 Тегін презентацияңыз дайын!\n\n💳 Келесі үшін «💰 Кредит сатып алу» басыңыз.`
             : `💳 Қалған презентация: *${remaining}*`),
         parse_mode: 'Markdown',
       }
@@ -204,7 +250,9 @@ async function makePresentaton(chatId, topic, isFree) {
   } catch (err) {
     console.error('[Bot] Error:', err.message);
 
+    // Қате болса — кредитті қайтар
     if (isFree) {
+      // freeUsed-ты қайтару мүмкін емес, сондықтан 1 кредит беру
       await addCredits(chatId, 1);
     } else {
       await addCredits(chatId, 1);
