@@ -150,19 +150,20 @@ function textPositionCSS(pos, imageType) {
 
 function renderTitle(slide, palette, big) {
   if (!slide.title) return '';
-  return '<h1 style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + (big || '38px') + ';font-weight:700;line-height:1.15;color:' + palette.text + ';letter-spacing:-0.5px;margin:0;">' + slide.title + '</h1>';
+  return '<h1 style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + (big || '42px') + ';font-weight:700;line-height:1.15;color:' + palette.text + ';letter-spacing:-0.5px;margin:0;">' + slide.title + '</h1>';
 }
 function renderSubtitle(slide, palette) {
   if (!slide.subtitle) return '';
-  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:18px;font-weight:400;line-height:1.6;color:' + palette.muted + ';margin:0;">' + slide.subtitle + '</p>';
+  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;font-weight:400;line-height:1.55;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.subtitle + '</p>';
 }
 function renderBody(slide, palette) {
   if (!slide.body) return '';
-  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:16px;font-weight:400;line-height:1.85;color:' + palette.muted + ';margin:0;">' + slide.body + '</p>';
+  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:16px;font-weight:400;line-height:1.65;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.body + '</p>';
 }
 function renderEyebrow(slide, accent) {
-  const label = slide.subtitle || slide.title || 'Overview';
-  return '<div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:' + accent + ';margin-bottom:18px;">' + label + '</div>';
+  const raw = slide.title || 'Overview';
+  const label = raw.split(' ').slice(0, 4).join(' ');
+  return '<div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:' + accent + ';margin-bottom:18px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + label + '</div>';
 }
 function renderDivider(accent) {
   return '<div style="width:52px;height:3px;background:' + accent + ';border-radius:2px;margin-bottom:24px;"></div>';
@@ -173,11 +174,11 @@ function renderQuoteMark(accent) {
 function renderBullets(slide, palette, accent, grid) {
   if (!slide.bullets || !slide.bullets.length) return '';
   const items = slide.bullets.map(function(b) {
-    return '<li style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">▸</span><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:16px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></li>';
+    return '<li style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">▸</span><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:18px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></li>';
   }).join('');
   if (grid) {
     const gridItems = slide.bullets.map(function(b) {
-      return '<div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:15px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></div>';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></div>';
     }).join('');
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;">' + gridItems + '</div>';
   }
@@ -188,9 +189,9 @@ function renderStats(slide, palette, accent) {
   const count = slide.stats.length;
   const useGrid = count >= 4;
   const cards = slide.stats.map(function(s) {
-    const padding = useGrid ? '20px 24px' : '28px 36px';
-    const fontSize = useGrid ? '38px' : '46px';
-    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:10px;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;">' + s.label + '</div></div>';
+    const padding = useGrid ? '16px 18px' : '22px 28px';
+    const fontSize = useGrid ? '32px' : '38px';
+    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
   }).join('');
   if (useGrid) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;">' + cards + '</div>';
