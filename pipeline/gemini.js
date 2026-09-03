@@ -243,6 +243,10 @@ Middle slides: mix freely.
 `;
 
   const result = await withRetry(() => model.generateContent(prompt), 'generateSlides');
+  const usage = result.response.usageMetadata;
+  if (usage) {
+    console.log(`[Tokens] generateSlides — input: ${usage.promptTokenCount}, output: ${usage.candidatesTokenCount}, total: ${usage.totalTokenCount}`);
+  }
   const text = result.response.text().trim();
   return parseGeminiJSON(text);
 }
@@ -309,6 +313,10 @@ Return the full presentation object with all slides.
 `;
 
   const result = await withRetry(() => model.generateContent(prompt), 'reviewSlides');
+  const usage = result.response.usageMetadata;
+  if (usage) {
+    console.log(`[Tokens] reviewSlides — input: ${usage.promptTokenCount}, output: ${usage.candidatesTokenCount}, total: ${usage.totalTokenCount}`);
+  }
   const text = result.response.text().trim();
 
   let reviewed;
@@ -328,4 +336,4 @@ Return the full presentation object with all slides.
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-      
+  
