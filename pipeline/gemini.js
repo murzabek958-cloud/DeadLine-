@@ -179,13 +179,12 @@ RULES:
 - Each slide must have different composition
 - imageQuery: English only, specific, photographic
 
-MANDATORY CONTENT RULES — every slide must be rich and readable:
-- subtitle: ALWAYS present, minimum 2 full sentences (30+ words) explaining the slide topic in detail
-- body: when present, write 3-5 full sentences (60+ words total) with real explanatory content, examples, and context
-- bullets: when present, minimum 4 items, each bullet must be a complete sentence of 10-15 words (not just a word or short phrase)
-- stats: minimum 3 stat cards, each with a specific number and a 5-8 word label explaining what it means
-- DO NOT write short placeholder text — write like a real expert presenting to an audience
-- Every slide must have enough text that a presenter can speak for 1-2 minutes from it
+MANDATORY CONTENT RULES:
+- subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
+- body: when present, 2-3 sentences (30-50 words) with clear explanatory content
+- bullets: when present, 3-5 items, each bullet 6-10 words (a clear short phrase, not a single word)
+- stats: 3 stat cards with real numbers and a short 3-5 word label
+- Write concise, clear content — not too long, not too short
 - Set unused fields to null`;
 
   const text = await withRetry(() => groqChat(system, user, 'generateSlides'), 'generateSlides');
@@ -232,3 +231,4 @@ Return the full corrected presentation JSON.`;
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
+    
