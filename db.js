@@ -94,4 +94,16 @@ async function setFreeUsed(chatId) {
   }
 }
 
-module.exports = { initDB, getUser, addCredits, useCredit, setFreeUsed };
+async function resetFreeUsed(chatId) {
+  try {
+    await pool.query(
+      'UPDATE users SET free_used = FALSE WHERE chat_id = $1',
+      [String(chatId)]
+    );
+    console.log(`[DB] resetFreeUsed: ${chatId}`);
+  } catch (err) {
+    console.error('[DB] resetFreeUsed error:', err.message);
+  }
+}
+
+module.exports = { initDB, getUser, addCredits, useCredit, setFreeUsed, resetFreeUsed };
