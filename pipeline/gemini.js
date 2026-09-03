@@ -2,7 +2,7 @@
 
 // ─── Groq клиенті (fetch арқылы, SDK орнатпай) ───────────────────────────
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL   = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_MODEL   = 'llama-4-scout-17b-16e-instruct';
 
 async function groqChat(systemPrompt, userPrompt, label) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -225,4 +225,3 @@ Return the full corrected presentation JSON.`;
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-                           
