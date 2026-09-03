@@ -23,10 +23,21 @@ async function withRetry(fn, label) {
       return await fn();
     } catch (err) {
       attempt++;
-      const is503 = err.message?.includes('503') || err.message?.includes('fetch failed');
-      if (!is503) throw err; // 503 емес қате болса — бірден шығар
-      const delay = Math.min(5000 * attempt, 30000); // 5с, 10с, 15с... макс 30с
-      console.warn(`[Gemini] ${label} — attempt ${attempt} failed (503). Retry in ${delay / 1000}s...`);
+      const msg = err.message || '';
+      const is503 = msg.includes('503') || msg.includes('fetch failed');
+      const is429 = msg.includes('429') || msg.includes('quota') || msg.includes('Quota');
+
+      if (!is503 && !is429) throw err; // басқа қате болса — бірден шығар
+
+      // 429 болса — Gemini айтқан уақытты оқы
+      let delay = Math.min(5000 * attempt, 30000); // дефолт: 5с, 10с... макс 30с
+      if (is429) {
+        const match = msg.match(/retry[^0-9]*(\d+)[^0-9]*s/i);
+        delay = match ? (parseInt(match[1]) + 5) * 1000 : 60000;
+      }
+
+      const reason = is429 ? '429 Quota' : '503';
+      console.warn(`[Gemini] ${label} — attempt ${attempt} failed (${reason}). Retry in ${delay / 1000}s...`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
@@ -131,7 +142,7 @@ function styleGuide(style) {
 
 // ─── 1. Generate ──────────────────────────────────────────────────────────
 async function generateSlides(topic, options = {}) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
 
   const slideCount = options.slideCount || null;
   const language   = options.language   || null;
@@ -253,7 +264,7 @@ Middle slides: mix freely.
 
 // ─── 2. Review & Improve ──────────────────────────────────────────────────
 async function reviewAndImproveSlides(presentation) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
   const presentationJSON = JSON.stringify(presentation, null, 2);
 
   const prompt = `
@@ -336,4 +347,4 @@ Return the full presentation object with all slides.
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-  
+        
