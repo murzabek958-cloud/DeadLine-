@@ -5,7 +5,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const fs          = require('fs');
 const { generatePresentation }                              = require('./index');
-const { initDB, getUser, addCredits, useCredit, setFreeUsed } = require('./db');
+const { initDB, getUser, addCredits, useCredit, setFreeUsed, resetFreeUsed } = require('./db');
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
@@ -250,15 +250,17 @@ async function makePresentaton(chatId, topic, isFree) {
   } catch (err) {
     console.error('[Bot] Error:', err.message);
 
-    // Қате болса — кредитті қайтар
-    if (isFree) {
-      // freeUsed-ты қайтару мүмкін емес, сондықтан 1 кредит беру
+    // Қате болса — тек кредит жұмсалған болса ғана қайтар
+    if (!isFree) {
       await addCredits(chatId, 1);
     } else {
-      await addCredits(chatId, 1);
+      // Тегін презентация қатесі — freeUsed-ты FALSE-қа қайтар
+      await resetFreeUsed(chatId);
     }
 
-    const errText = '❌ Қате орын алды, кредитіңіз қайтарылды.\n\nТақырыпты қайта жіберіп көріңіз.';
+    const errText = isFree
+      ? '❌ Қате орын алды.\n\nТегін презентацияңыз қайтарылды, қайта жіберіп көріңіз.'
+      : '❌ Қате орын алды, кредитіңіз қайтарылды.\n\nТақырыпты қайта жіберіп көріңіз.';
 
     if (statusMsg) {
       await bot.editMessageText(errText, {
@@ -283,4 +285,4 @@ initDB()
     console.error('[DB] Init error:', err);
     process.exit(1);
   });
-    
+      
