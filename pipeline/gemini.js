@@ -15,6 +15,23 @@ function parseGeminiJSON(text) {
   }
 }
 
+// ─── Retry helper — сәтті болғанша қайталайды ─────────────────────────────
+async function withRetry(fn, label) {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt++;
+      const is503 = err.message?.includes('503') || err.message?.includes('fetch failed');
+      if (!is503) throw err; // 503 емес қате болса — бірден шығар
+      const delay = Math.min(5000 * attempt, 30000); // 5с, 10с, 15с... макс 30с
+      console.warn(`[Gemini] ${label} — attempt ${attempt} failed (503). Retry in ${delay / 1000}s...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 // ─── Параметрлерді парсинг ─────────────────────────────────────────────────
 // "Жасанды интеллект, 10 слайд, орысша, бизнес стиль"
 // → { topic, slideCount, language, style }
@@ -225,7 +242,7 @@ Middle slides: mix freely.
 - Mentally check every slide before returning JSON.
 `;
 
-  const result = await model.generateContent(prompt);
+  const result = await withRetry(() => model.generateContent(prompt), 'generateSlides');
   const text = result.response.text().trim();
   return parseGeminiJSON(text);
 }
@@ -291,7 +308,7 @@ Respond ONLY with valid JSON. No markdown. No explanation.
 Return the full presentation object with all slides.
 `;
 
-  const result = await model.generateContent(prompt);
+  const result = await withRetry(() => model.generateContent(prompt), 'reviewSlides');
   const text = result.response.text().trim();
 
   let reviewed;
@@ -311,3 +328,4 @@ Return the full presentation object with all slides.
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
+      
