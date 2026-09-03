@@ -174,11 +174,18 @@ RULES:
 - composition.mood: "dark" "light" "warm" "cold" "vivid"
 - composition.elements: "eyebrow" "title" "subtitle" "divider" "body" "bullets" "stats" "quote_mark"
 - composition.decorative: "accent_line_left" "accent_line_right" "corner_circle" "bottom_rule" "grid_dots"
-- Slide 1: cover — full_background, strong overlay, large title
-- Last slide: closing — full_background, centered, minimal text
+- Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
+- Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
 - imageQuery: English only, specific, photographic
-- bullets: max 6, stats: max 4, body: 1-3 sentences
+
+MANDATORY CONTENT RULES — every slide must be rich and readable:
+- subtitle: ALWAYS present, minimum 2 full sentences (30+ words) explaining the slide topic in detail
+- body: when present, write 3-5 full sentences (60+ words total) with real explanatory content, examples, and context
+- bullets: when present, minimum 4 items, each bullet must be a complete sentence of 10-15 words (not just a word or short phrase)
+- stats: minimum 3 stat cards, each with a specific number and a 5-8 word label explaining what it means
+- DO NOT write short placeholder text — write like a real expert presenting to an audience
+- Every slide must have enough text that a presenter can speak for 1-2 minutes from it
 - Set unused fields to null`;
 
   const text = await withRetry(() => groqChat(system, user, 'generateSlides'), 'generateSlides');
