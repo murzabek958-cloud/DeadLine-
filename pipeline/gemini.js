@@ -14,7 +14,7 @@ async function groqChat(systemPrompt, userPrompt, label) {
     body: JSON.stringify({
       model: GROQ_MODEL,
       temperature: 0.7,
-      max_tokens: 8192,
+      max_tokens: 4096,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -177,13 +177,13 @@ RULES:
 - Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
 - Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
-- imageQuery: English only, photographic. NEVER use specific names of people, buildings, or historical sites (e.g. NOT "Mausoleum at Halicarnassus" or "Titanic ship"). Instead describe the SCENE, MOOD, LIGHTING (e.g. "ancient marble ruins columns sunrise dramatic shadows", "ocean liner night dark sea fog cinematic", "stone monument desert golden hour aerial")
+- imageQuery: English only, specific, photographic
 
 MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
 - body: when present, 2-3 sentences (30-50 words) with clear explanatory content
 - bullets: when present, 3-5 items, each bullet 6-10 words (a clear short phrase, not a single word)
-- stats: 3 stat cards with real numbers and a short 3-5 word label. value MUST be max 6 characters (e.g. "1 514", "710", "2ч40м", "46%", "$10M"). NEVER write long values like "1.5 млн" or "2 ч 40 мин"
+- stats: 3 stat cards with real numbers and a short 3-5 word label
 - Write concise, clear content — not too long, not too short
 - Set unused fields to null`;
 
@@ -197,23 +197,18 @@ async function reviewAndImproveSlides(presentation) {
 
   const system = `You are a senior art director doing visual QC. You ALWAYS respond with valid JSON only. No markdown, no explanation. Just raw JSON.`;
 
-  const user = `Review this presentation JSON and fix ALL problems. Do NOT redesign. Keep same number of slides.
+  const user = `Review this presentation JSON and fix visual problems only. Do NOT redesign. Keep same number of slides.
 
 ${presentationJSON}
 
-Fix ALL of the following:
+Fix only:
 - Text readability over images (fix overlay or textPosition)
 - Title too long (>8 words) → shorten
 - full_background + dark_gradient_left → textPosition must be center_left
 - full_background + dark_gradient_right → textPosition must be center_right
 - Too many bullets (>6) or body sentences (>3) → trim
 - full_background + overlay=none → add dark_gradient_bottom
-- imageQuery contains specific names (person, building, historical site) → rewrite as generic scene description with mood+lighting only (e.g. "ancient ruins marble columns golden hour" not "Mausoleum at Halicarnassus")
 - Vague imageQuery → rewrite in English with scene+mood+lighting
-- stat value longer than 6 chars → shorten (e.g. "1.5 млн" to "1.5М", "2 ч 40 мин" to "2ч40м")
-- bullet item longer than 10 words → shorten to 8 words
-- subtitle longer than 25 words → trim
-- body longer than 50 words → trim
 
 Return the full corrected presentation JSON.`;
 
@@ -236,4 +231,4 @@ Return the full corrected presentation JSON.`;
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-
+    
