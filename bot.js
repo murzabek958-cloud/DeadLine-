@@ -4,8 +4,8 @@ require('dotenv').config();
 
 const TelegramBot = require('node-telegram-bot-api');
 const fs          = require('fs');
-const { generatePresentation }                                                      = require('./index');
-const { initDB, getUser, registerUser, addCredits, incrementRefCount, useCredit, setFreeUsed, resetFreeUsed } = require('./db');
+const { generatePresentation }                              = require('./index');
+const { initDB, getUser, addCredits, useCredit, setFreeUsed, resetFreeUsed } = require('./db');
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
@@ -13,22 +13,16 @@ const KASPI_PHONE = '+77713436592';
 const KASPI_NAME  = 'Мурзабек Н';
 const PRICE       = 250;
 const ADMIN_ID    = process.env.ADMIN_CHAT_ID;
-const BOT_USERNAME = process.env.BOT_USERNAME || 'DeadLine_prezbot'; // Railway-да BOT_USERNAME env қой
 
 const processing      = new Set();
 const waitingForCount = new Set();
-
-// Markdown арнайы символдарын escape жасау
-function escapeMarkdown(text) {
-  return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
-}
 
 // ─── Негізгі менюдің батырмалары ───────────────────────────────────────────
 const MAIN_KEYBOARD = {
   reply_markup: {
     keyboard: [
-      [{ text: '💳 Менің есепшотым' }, { text: '🔗 Реферал сілтемем' }],
-      [{ text: '💰 Кредит сатып алу' }, { text: '❓ Көмек' }],
+      [{ text: '💳 Менің есепшотым' }, { text: '❓ Көмек' }],
+      [{ text: '💰 Кредит сатып алу' }],
     ],
     resize_keyboard: true,
     persistent: true,
@@ -37,24 +31,11 @@ const MAIN_KEYBOARD = {
 };
 
 // ─── /start ────────────────────────────────────────────────────────────────
-bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
-  const chatId   = msg.chat.id;
-  const payload  = match?.[1]?.trim();
-  let referredBy = null;
-
-  if (payload && payload.startsWith('ref_')) {
-    referredBy = payload.replace('ref_', '');
-    if (referredBy === String(chatId)) referredBy = null; // өзін жіберген болса — есептемей
-  }
-
-  await registerUser(chatId, referredBy);
-  const user = await getUser(chatId);
-
-  // Реферал санауы презентация жасатқанда өседі — тіркелуде емес
-
+bot.onText(/\/start/, async (msg) => {
+  const user    = await getUser(msg.chat.id);
   const hasFree = !user.freeUsed;
   bot.sendMessage(
-    chatId,
+    msg.chat.id,
     '👋 Сәлем! Мен кәсіби презентация жасайтын ботпын.\n\n' +
     (hasFree
       ? '🎁 Сізге *1 тегін презентация* бар!\n\nТақырыпты жазыңыз — бастаймыз.'
@@ -63,7 +44,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   );
 });
 
-// ─── /balance & "Менің есепшотым" ─────────────────────────────────────────
+// ─── /balance & "Менің есепшотым" батырмасы ───────────────────────────────
 bot.onText(/\/balance/, (msg) => showBalance(msg.chat.id));
 
 async function showBalance(chatId) {
@@ -77,29 +58,8 @@ async function showBalance(chatId) {
     `📊 *Менің есепшотым*\n\n` +
     `💳 Кредит: *${user.credits}* презентация\n` +
     `📦 Жалпы сатып алынды: *${user.total}*\n` +
-    `🔗 Реферал табысы: *${user.refEarnings}* кредит\n` +
     `${freeStatus}`,
     { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
-  );
-}
-
-// ─── /referral & "Реферал сілтемем" ───────────────────────────────────────
-bot.onText(/\/referral/, (msg) => showReferral(msg.chat.id));
-
-async function showReferral(chatId) {
-  const user = await getUser(chatId);
-  const link = `https://t.me/${BOT_USERNAME}?start=ref_${chatId}`;
-
-  bot.sendMessage(
-    chatId,
-    `🔗 *Реферал бағдарламасы*\n\n` +
-    `Сенің жеке сілтемең:\n${link}\n\n` +
-    `📌 *Қалай жұмыс жасайды:*\n` +
-    `• Достарыңа осы сілтемені жіберіңіз\n` +
-    `• Әр *3 адам* тіркелсе — сізге *1 кредит* қосылады\n` +
-    `• Шектеу жоқ — неше адам болса, сонша!\n\n` +
-    `👥 Тіркелген: *${user.refEarnings}* адам\nКелесі кредит үшін: *${3 - (user.refEarnings % 3)}* адам қажет`,
-    { parse_mode: 'Markdown', disable_web_page_preview: true, ...MAIN_KEYBOARD }
   );
 }
 
@@ -120,7 +80,7 @@ function showHelp(chatId) {
   );
 }
 
-// ─── /confirm <chatId> <amount> — тек admin ───────────────────────────────
+// ─── /confirm <chatId> <amount> — тек admin ────────────────────────────────
 bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
   if (String(msg.chat.id) !== String(ADMIN_ID)) return;
 
@@ -132,8 +92,6 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
   }
 
   const user = await addCredits(targetId, amount);
-
-  // Реферал бонусы тіркелу кезінде беріледі — төлемде емес
 
   await bot.sendMessage(
     targetId,
@@ -147,17 +105,24 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, `✅ ${targetId} → +${amount} кредит. Қалған: ${user.credits}. Жиыны: ${user.total}.`);
 });
 
-// ─── Негізгі хабар обработчигі ────────────────────────────────────────────
+// ─── Негізгі хабар обработчигі ─────────────────────────────────────────────
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text   = msg.text;
 
   if (text && text.startsWith('/')) return;
 
-  if (text === '💳 Менің есепшотым') return showBalance(chatId);
-  if (text === '❓ Көмек')           return showHelp(chatId);
-  if (text === '🔗 Реферал сілтемем') return showReferral(chatId);
+  // ── Батырма: Менің есепшотым ─────────────────────────────────────────────
+  if (text === '💳 Менің есепшотым') {
+    return showBalance(chatId);
+  }
 
+  // ── Батырма: Көмек ────────────────────────────────────────────────────────
+  if (text === '❓ Көмек') {
+    return showHelp(chatId);
+  }
+
+  // ── Батырма: Кредит сатып алу ────────────────────────────────────────────
   if (text === '💰 Кредит сатып алу') {
     waitingForCount.add(chatId);
     return bot.sendMessage(
@@ -167,7 +132,7 @@ bot.on('message', async (msg) => {
     );
   }
 
-  // Чек (PDF)
+  // ── Чек (PDF) ────────────────────────────────────────────────────────────
   if (msg.document) {
     const fileName = (msg.document.file_name || '').toLowerCase();
     const isPdf    = fileName.endsWith('.pdf') || msg.document.mime_type === 'application/pdf';
@@ -195,6 +160,7 @@ bot.on('message', async (msg) => {
 
   if (!text) return;
 
+  // ── Сан күтіп тұрмыз ба — БІРІНШІ тексер ────────────────────────────────
   if (waitingForCount.has(chatId)) {
     const count = parseInt(text.trim(), 10);
     if (isNaN(count) || count < 1 || count > 50) {
@@ -211,11 +177,20 @@ bot.on('message', async (msg) => {
     );
   }
 
+  // ── Пайдаланушы мәліметін алу ───────────────────────────────────────────
   const user = await getUser(chatId);
 
-  if (!user.freeUsed) return makePresentaton(chatId, text, true);
-  if (user.credits > 0) return makePresentaton(chatId, text, false);
+  // ── Тегін презентация бар ────────────────────────────────────────────────
+  if (!user.freeUsed) {
+    return makePresentaton(chatId, text, true);
+  }
 
+  // ── Кредит бар ───────────────────────────────────────────────────────────
+  if (user.credits > 0) {
+    return makePresentaton(chatId, text, false);
+  }
+
+  // ── Кредит жоқ → төлемге жібер ───────────────────────────────────────────
   waitingForCount.add(chatId);
   return bot.sendMessage(
     chatId,
@@ -224,7 +199,7 @@ bot.on('message', async (msg) => {
   );
 });
 
-// ─── Презентация жасау ────────────────────────────────────────────────────
+// ─── Презентация жасау ─────────────────────────────────────────────────────
 async function makePresentaton(chatId, topic, isFree) {
   if (processing.has(chatId)) {
     return bot.sendMessage(chatId, '⏳ Презентацияңыз жасалып жатыр, күтіңіз...');
@@ -234,37 +209,18 @@ async function makePresentaton(chatId, topic, isFree) {
 
   if (isFree) {
     await setFreeUsed(chatId);
-    // Реферал иесіне есептей — тегін презентация жасатқанда
-    const u = await getUser(chatId);
-    if (u.referredBy) {
-      const { newCount, bonusGiven } = await incrementRefCount(u.referredBy);
-      const remaining = 3 - (newCount % 3);
-      if (bonusGiven) {
-        bot.sendMessage(
-          u.referredBy,
-          `🎉 *+1 кредит!* Сенің реферал сілтемең арқылы ${newCount} адам презентация жасатты!\n\nКелесі кредит үшін тағы *3 адам* қажет.`,
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      } else {
-        bot.sendMessage(
-          u.referredBy,
-          `👥 Сенің реферал сілтемең арқылы жаңа адам презентация жасатты!\n\nКредит алу үшін тағы *${remaining} адам* керек.`,
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      }
-    }
   } else {
     await useCredit(chatId);
   }
 
-  const userAfter   = await getUser(chatId);
-  const remaining   = userAfter.credits;
+  const userAfter = await getUser(chatId);
+  const remaining = userAfter.credits;
   let statusMsg;
 
   try {
     statusMsg = await bot.sendMessage(
       chatId,
-      `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${escapeMarkdown(topic)}*\n` +
+      `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${topic}*\n` +
       (isFree ? '🎁 Тегін презентация\n' : `💳 Қалған кредит: ${remaining}\n`) +
       `\n_1-2 минут күтіңіз..._`,
       { parse_mode: 'Markdown' }
@@ -281,7 +237,7 @@ async function makePresentaton(chatId, topic, isFree) {
       pptxPath,
       {
         caption:
-          `📊 *${escapeMarkdown(title)}*\n\n` +
+          `📊 *${title}*\n\n` +
           (isFree
             ? `🎁 Тегін презентацияңыз дайын!\n\n💳 Келесі үшін «💰 Кредит сатып алу» басыңыз.`
             : `💳 Қалған презентация: *${remaining}*`),
@@ -294,10 +250,12 @@ async function makePresentaton(chatId, topic, isFree) {
   } catch (err) {
     console.error('[Bot] Error:', err.message);
 
-    if (isFree) {
-      await resetFreeUsed(chatId);
-    } else {
+    // Қате болса — тек кредит жұмсалған болса ғана қайтар
+    if (!isFree) {
       await addCredits(chatId, 1);
+    } else {
+      // Тегін презентация қатесі — freeUsed-ты FALSE-қа қайтар
+      await resetFreeUsed(chatId);
     }
 
     const errText = isFree
@@ -317,7 +275,7 @@ async function makePresentaton(chatId, topic, isFree) {
   }
 }
 
-// ─── Іске қосу ───────────────────────────────────────────────────────────
+// ─── Іске қосу ─────────────────────────────────────────────────────────────
 initDB()
   .then(() => {
     bot.startPolling();
@@ -327,4 +285,4 @@ initDB()
     console.error('[DB] Init error:', err);
     process.exit(1);
   });
-
+      
