@@ -348,7 +348,7 @@ function buildSlideHTML(slide, imageUrl) {
   const textCSS    = textPositionCSS(effectiveTextPos, effectiveImageType);
 
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
-  const showFallback   = !img && !hasRichContent;
+  const showFallback   = !img;
 
   // right_half / left_half + сурет жоқ → бос жаққа SVG визуал
   const isSplit = effectiveImageType === 'right_half' || effectiveImageType === 'left_half';
