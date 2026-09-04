@@ -9,8 +9,39 @@ const { renderAllSlides } = require('./pipeline/renderer');
 const { exportToPptx }  = require('./pipeline/pptxExporter');
 const fs = require('fs');
 
+// Query-ді жалпылама етіп қысқарту
+function simplifyQuery(query) {
+  // Нақты атауларды алып тастап, жалпы сөздер қалдыру
+  const words = query.split(/[\s,]+/).filter(w => w.length > 3);
+  // Алғашқы 3-4 мағыналы сөзді алу
+  const simple = words.slice(0, 4).join(' ');
+  return simple;
+}
+
+async function fetchImageWithFallback(query, topic) {
+  // 1. Нақты query
+  let url = await fetchImage(query);
+  if (url) return url;
+
+  // 2. Қысқартылған query
+  const simple = simplifyQuery(query);
+  if (simple && simple !== query) {
+    console.log(`[Image] retry with simplified: "${simple}"`);
+    url = await fetchImage(simple);
+    if (url) return url;
+  }
+
+  // 3. Тақырып бойынша жалпы query
+  if (topic) {
+    console.log(`[Image] retry with topic: "${topic}"`);
+    url = await fetchImage(topic + ' dramatic lighting');
+    if (url) return url;
+  }
+
+  return null;
+}
+
 async function generatePresentation(userInput) {
-  // Пайдаланушы енгізуін парсинг жаса
   const { topic, slideCount, language, style } = parseUserInput(userInput);
 
   console.log(`[Pipeline] Topic: ${topic}`);
@@ -34,8 +65,9 @@ async function generatePresentation(userInput) {
   console.log('[Pipeline] Fetching images and building HTML...');
   const htmlSlides = [];
   for (const slide of slides) {
-    console.log(`[Image] query="${slide.imageQuery}"`);
-    const imageUrl = await fetchImage(typeof slide.imageQuery === 'string' ? slide.imageQuery : '');
+    const query = typeof slide.imageQuery === 'string' ? slide.imageQuery : '';
+    console.log(`[Image] query="${query}"`);
+    const imageUrl = await fetchImageWithFallback(query, topic);
     const html = buildSlideHTML(slide, imageUrl);
     htmlSlides.push(html);
   }
@@ -59,3 +91,4 @@ async function generatePresentation(userInput) {
 }
 
 module.exports = { generatePresentation };
+    
