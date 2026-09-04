@@ -18,6 +18,11 @@ const BOT_USERNAME = process.env.BOT_USERNAME || 'DeadLine_prezbot'; // Railway-
 const processing      = new Set();
 const waitingForCount = new Set();
 
+// Markdown арнайы символдарын escape жасау
+function escapeMarkdown(text) {
+  return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+}
+
 // ─── Негізгі менюдің батырмалары ───────────────────────────────────────────
 const MAIN_KEYBOARD = {
   reply_markup: {
@@ -259,7 +264,7 @@ async function makePresentaton(chatId, topic, isFree) {
   try {
     statusMsg = await bot.sendMessage(
       chatId,
-      `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${topic}*\n` +
+      `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${escapeMarkdown(topic)}*\n` +
       (isFree ? '🎁 Тегін презентация\n' : `💳 Қалған кредит: ${remaining}\n`) +
       `\n_1-2 минут күтіңіз..._`,
       { parse_mode: 'Markdown' }
@@ -276,7 +281,7 @@ async function makePresentaton(chatId, topic, isFree) {
       pptxPath,
       {
         caption:
-          `📊 *${title}*\n\n` +
+          `📊 *${escapeMarkdown(title)}*\n\n` +
           (isFree
             ? `🎁 Тегін презентацияңыз дайын!\n\n💳 Келесі үшін «💰 Кредит сатып алу» басыңыз.`
             : `💳 Қалған презентация: *${remaining}*`),
@@ -322,4 +327,4 @@ initDB()
     console.error('[DB] Init error:', err);
     process.exit(1);
   });
-      
+
