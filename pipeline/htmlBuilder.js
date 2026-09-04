@@ -130,13 +130,22 @@ function buildFallbackVisual(accent, mood, slideIndex) {
 }
 
 function textPositionCSS(pos, imageType) {
+  // right_half сурет: мәтін сол жақта, максимум 46% ені
+  if (imageType === 'right_half') {
+    return 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;top:50%;left:72px;transform:translateY(-50%);width:44%;max-width:540px;';
+  }
+  // left_half сурет: мәтін оң жақта, максимум 46% ені
+  if (imageType === 'left_half') {
+    return 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;top:50%;right:72px;transform:translateY(-50%);width:44%;max-width:540px;text-align:left;';
+  }
+
   if (pos === 'left_column') {
     return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;width:calc(48% - 0px);max-width:580px;padding:64px 56px 64px 80px';
   }
   if (pos === 'right_column') {
     return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:calc(52% - 0px);padding:64px 72px 64px 56px';
   }
-  const shared = 'position:absolute;z-index:2;max-width:700px;display:flex;flex-direction:column;gap:18px;';
+  const shared = 'position:absolute;z-index:2;max-width:600px;display:flex;flex-direction:column;gap:18px;';
   switch (pos) {
     case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%';
     case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%)';
