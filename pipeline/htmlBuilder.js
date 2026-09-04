@@ -62,7 +62,7 @@ function imagePlacement(imageType, img) {
       return { wrapperCSS: '' };
   }
 }
-function buildFallbackVisual(accent, mood, index) {
+function buildFallbackVisual(accent, mood, index, topic) {
   const a  = accent || '#d4a843';
   const a1 = a + 'cc';
   const a2 = a + '55';
@@ -91,6 +91,7 @@ function buildFallbackVisual(accent, mood, index) {
       + '<circle cx="250" cy="250" r="20" fill="' + a + '" opacity="0.9"/>'
       + '<circle cx="250" cy="250" r="34" stroke="' + a1 + '" stroke-width="1.5" fill="none"/>'
       + '<circle cx="250" cy="250" r="52" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
+      + (topic ? '<text x="250" y="460" text-anchor="middle" font-family="sans-serif" font-size="13" fill="' + a + '" opacity="0.5" letter-spacing="2">' + String(topic).toUpperCase().slice(0, 20) + '</text>' : '')
       + '</svg>';
   }
 
@@ -252,7 +253,7 @@ function sanitizeComposition(imageType, overlayType, img) {
 }
 
 // right_half/left_half слайдтарда бос жақта SVG визуал шығару
-function buildSplitFallbackSVG(accent, side, index) {
+function buildSplitFallbackSVG(accent, side, index, topic) {
   const a  = accent || '#d4a843';
   const a2 = a + '55';
   const a3 = a + '22';
@@ -315,7 +316,8 @@ function buildSplitFallbackSVG(accent, side, index) {
       + '</svg>';
   }
 
-  return '<div style="position:absolute;top:0;' + pos + 'width:52%;height:100%;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">' + svg + '</div>';
+  const topicLabel = topic ? '<div style="position:absolute;bottom:40px;left:0;right:0;text-align:center;font-family:sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:' + (accent||'#d4a843') + ';opacity:0.45;">' + String(topic).toUpperCase().slice(0,20) + '</div>' : '';
+  return '<div style="position:absolute;top:0;' + pos + 'width:52%;height:100%;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">' + svg + topicLabel + '</div>';
 }
 
 function buildSlideHTML(slide, imageUrl) {
@@ -353,9 +355,9 @@ function buildSlideHTML(slide, imageUrl) {
   // right_half / left_half + сурет жоқ → бос жаққа SVG визуал
   const isSplit = effectiveImageType === 'right_half' || effectiveImageType === 'left_half';
   const splitSide = effectiveImageType === 'right_half' ? 'right' : 'left';
-  const splitFallbackSVG = !img && isSplit ? buildSplitFallbackSVG(accent, splitSide, idx) : '';
+  const splitFallbackSVG = !img && isSplit ? buildSplitFallbackSVG(accent, splitSide, idx, slide.title) : '';
 
-  const fallbackSVG = showFallback && !isSplit ? buildFallbackVisual(accent, mood, idx) : '';
+  const fallbackSVG = showFallback && !isSplit ? buildFallbackVisual(accent, mood, idx, slide.title) : '';
 
   const bgLayer = wrapperCSS
     ? '<div style="' + wrapperCSS + '"></div>'
