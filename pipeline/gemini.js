@@ -31,7 +31,6 @@ async function groqChat(systemPrompt, userPrompt, label) {
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content || '';
 
-  // Токен логы
   if (data.usage) {
     console.log(`[Tokens] ${label} — input: ${data.usage.prompt_tokens}, output: ${data.usage.completion_tokens}, total: ${data.usage.total_tokens}`);
   }
@@ -151,7 +150,7 @@ Return this JSON structure:
       "body": "...",
       "bullets": ["...", "..."],
       "stats": [{ "value": "...", "label": "..." }],
-      "imageQuery": "English photographic query with scene, mood, lighting",
+      "imageQuery": "landscape mountains misty forest dramatic lighting",
       "composition": {
         "image": "full_background",
         "overlay": "dark_gradient_left",
@@ -177,7 +176,14 @@ RULES:
 - Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
 - Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
-- imageQuery: English only, specific, photographic
+- imageQuery: CRITICAL RULES:
+  * English only, 3-6 words, NO proper nouns, NO country/city names
+  * Must be a LANDSCAPE/NATURE/ABSTRACT scene — never animals, people, or logos
+  * Good examples: "misty alpine meadow sunrise", "dense green forest aerial", "mountain glacier blue sky", "abstract dark geometric pattern", "ocean waves dramatic storm"
+  * Bad examples: "Switzerland nature", "Swiss cows", "Geneva city", "wildlife animals" — these return wrong images
+  * For wildlife/animals slides: use "dense forest wildlife habitat dusk" or "misty rainforest canopy green"
+  * For city/economy slides: use "modern glass skyscrapers aerial night" or "city lights bokeh dark"
+  * For data/stats slides: set imageQuery to null and use composition.image = "none"
 
 MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
@@ -208,7 +214,9 @@ Fix only:
 - full_background + dark_gradient_right → textPosition must be center_right
 - Too many bullets (>6) or body sentences (>3) → trim
 - full_background + overlay=none → add dark_gradient_bottom
-- Vague imageQuery → rewrite in English with scene+mood+lighting
+- imageQuery that contains country/city names or animal names → rewrite as abstract landscape query in English (3-6 words, no proper nouns)
+- imageQuery that might return wrong images (e.g. "Swiss wildlife", "alpine cows") → replace with abstract nature query like "dense forest mist dramatic lighting"
+- slides with stats → set imageQuery to null, set composition.image to "none"
 
 Return the full corrected presentation JSON.`;
 
@@ -231,4 +239,3 @@ Return the full corrected presentation JSON.`;
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-    
