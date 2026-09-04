@@ -177,7 +177,7 @@ RULES:
 - Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
 - Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
-- imageQuery: English only, specific, photographic
+- imageQuery: English only, photographic. NEVER use specific names of people, buildings, or historical sites (e.g. NOT "Mausoleum at Halicarnassus" or "Titanic ship"). Instead describe the SCENE, MOOD, LIGHTING (e.g. "ancient marble ruins columns sunrise dramatic shadows", "ocean liner night dark sea fog cinematic", "stone monument desert golden hour aerial")
 
 MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
@@ -208,6 +208,7 @@ Fix ALL of the following:
 - full_background + dark_gradient_right → textPosition must be center_right
 - Too many bullets (>6) or body sentences (>3) → trim
 - full_background + overlay=none → add dark_gradient_bottom
+- imageQuery contains specific names (person, building, historical site) → rewrite as generic scene description with mood+lighting only (e.g. "ancient ruins marble columns golden hour" not "Mausoleum at Halicarnassus")
 - Vague imageQuery → rewrite in English with scene+mood+lighting
 - stat value longer than 6 chars → shorten (e.g. "1.5 млн" to "1.5М", "2 ч 40 мин" to "2ч40м")
 - bullet item longer than 10 words → shorten to 8 words
@@ -236,4 +237,3 @@ Return the full corrected presentation JSON.`;
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
 
-                  
