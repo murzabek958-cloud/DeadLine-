@@ -17,7 +17,7 @@ const LOGO_WHITE = getLogoBase64();
 
 const MOOD = {
   dark:  { bg: '#0d1117', text: '#ffffff', muted: 'rgba(255,255,255,0.6)',  surface: 'rgba(255,255,255,0.06)' },
-  light: { bg: '#f5f2ed', text: '#1a1a1a', muted: 'rgba(0,0,0,0.45)',      surface: 'rgba(0,0,0,0.04)' },
+  light: { bg: '#f5f2ed', text: '#1a1a1a', muted: 'rgba(0,0,0,0.70)',      surface: 'rgba(0,0,0,0.06)' },
   warm:  { bg: '#1e1209', text: '#f5e8d0', muted: 'rgba(245,232,208,0.6)', surface: 'rgba(255,255,255,0.06)' },
   cold:  { bg: '#0c1622', text: '#e8f0f8', muted: 'rgba(232,240,248,0.6)', surface: 'rgba(255,255,255,0.07)' },
   vivid: { bg: '#0a0a0a', text: '#ffffff', muted: 'rgba(255,255,255,0.65)', surface: 'rgba(255,255,255,0.08)' },
