@@ -129,22 +129,25 @@ function buildFallbackVisual(accent, mood, index) {
 }
 
 function textPositionCSS(pos, imageType) {
+  // Split layout: мәтін бағаны — суреттің жағынан қарама-қарсы жақта
   if (pos === 'left_column') {
-    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;width:calc(48% - 0px);max-width:580px;padding:64px 56px 64px 80px';
+    // right_half сурет оң жақта (52%) → мәтін сол жақта (48%)
+    return 'position:absolute;top:0;left:0;width:48%;height:100%;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:64px 48px 64px 80px;box-sizing:border-box';
   }
   if (pos === 'right_column') {
-    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:calc(52% - 0px);padding:64px 72px 64px 56px';
+    // left_half сурет сол жақта (48%) → мәтін оң жақта (52%)
+    return 'position:absolute;top:0;right:0;width:52%;height:100%;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;padding:64px 72px 64px 56px;box-sizing:border-box';
   }
-  const shared = 'position:absolute;z-index:2;max-width:700px;display:flex;flex-direction:column;gap:18px;';
+  const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
   switch (pos) {
-    case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%';
-    case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%)';
-    case 'center_right':  return shared + 'top:50%;right:80px;transform:translateY(-50%);text-align:right';
-    case 'top_left':      return shared + 'top:64px;left:80px';
-    case 'top_center':    return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center';
-    case 'bottom_left':   return shared + 'bottom:72px;left:80px';
-    case 'bottom_center': return shared + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center';
-    default:              return shared + 'top:50%;left:80px;transform:translateY(-50%)';
+    case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:70%;max-width:840px';
+    case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:640px';
+    case 'center_right':  return shared + 'top:50%;right:80px;transform:translateY(-50%);text-align:right;max-width:640px';
+    case 'top_left':      return shared + 'top:64px;left:80px;max-width:640px';
+    case 'top_center':    return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;width:70%;max-width:840px';
+    case 'bottom_left':   return shared + 'bottom:72px;left:80px;max-width:640px';
+    case 'bottom_center': return shared + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center;width:70%;max-width:840px';
+    default:              return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:640px';
   }
 }
 
@@ -228,8 +231,23 @@ function renderDecor(d, accent, palette) {
 
 function sanitizeComposition(imageType, overlayType, img) {
   let safeOverlay = overlayType;
-  if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = 'dark_gradient_bottom';
-  if ((imageType === 'right_half' || imageType === 'left_half') && (overlayType === 'dark_full' || overlayType === 'light_full')) safeOverlay = 'none';
+
+  // full_background + сурет бар: overlay міндетті болуы керек
+  if (imageType === 'full_background' && img) {
+    if (overlayType === 'none') safeOverlay = 'dark_gradient_bottom';
+  }
+
+  // top_strip / bottom_strip: мәтін суреттің үстінде тұрмайды → overlay не керек емес
+  if ((imageType === 'top_strip' || imageType === 'bottom_strip') && img) {
+    if (overlayType === 'dark_full' || overlayType === 'light_full') safeOverlay = 'none';
+  }
+
+  // right_half / left_half: split layout — overlay мәтін жағына тиіп кетпесін
+  if ((imageType === 'right_half' || imageType === 'left_half') &&
+      (overlayType === 'dark_full' || overlayType === 'light_full')) {
+    safeOverlay = 'none';
+  }
+
   return safeOverlay;
 }
 
@@ -313,20 +331,28 @@ function buildSlideHTML(slide, imageUrl) {
   const idx         = (slide.index || 1) - 1;
 
   const palette    = MOOD[mood] || MOOD.dark;
-  // Stat cards бар слайдта сурет керек емес — cards + image = толып кетеді
   const hasStats = slide.stats && slide.stats.length > 0;
   const img = imageUrl || '';
-  const safeOverlay = hasStats && img ? 'dark_full' : sanitizeComposition(imageType, overlayType, img);
-  const { wrapperCSS } = imagePlacement(imageType, img);
+
+  // Stat cards бар слайдта split layout жұмыс жасамайды — мәтін бір бағанда болу керек
+  const effectiveImageType = hasStats ? 'none' : imageType;
+
+  // split layout-та textPosition дұрыс болуын қамтамасыз ету
+  let effectiveTextPos = textPos;
+  if (effectiveImageType === 'right_half' && textPos !== 'left_column')  effectiveTextPos = 'left_column';
+  if (effectiveImageType === 'left_half'  && textPos !== 'right_column') effectiveTextPos = 'right_column';
+
+  const safeOverlay = sanitizeComposition(effectiveImageType, overlayType, img);
+  const { wrapperCSS } = imagePlacement(effectiveImageType, img);
   const hasOverlay = img && safeOverlay !== 'none';
-  const textCSS    = textPositionCSS(textPos, imageType);
+  const textCSS    = textPositionCSS(effectiveTextPos, effectiveImageType);
 
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
   const showFallback   = !img && !hasRichContent;
 
   // right_half / left_half + сурет жоқ → бос жаққа SVG визуал
-  const isSplit = imageType === 'right_half' || imageType === 'left_half';
-  const splitSide = imageType === 'right_half' ? 'right' : 'left';
+  const isSplit = effectiveImageType === 'right_half' || effectiveImageType === 'left_half';
+  const splitSide = effectiveImageType === 'right_half' ? 'right' : 'left';
   const splitFallbackSVG = !img && isSplit ? buildSplitFallbackSVG(accent, splitSide, idx) : '';
 
   const fallbackSVG = showFallback && !isSplit ? buildFallbackVisual(accent, mood, idx) : '';
@@ -341,7 +367,7 @@ function buildSlideHTML(slide, imageUrl) {
 
   console.log('[HTML] image:', img ? 'YES' : ('NO (fallback:' + showFallback + ')'));
 
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;background:' + palette.bg + ';font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;}</style></head><body><div class="slide">'
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;overflow:hidden;background:' + palette.bg + ';font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;}</style></head><body><div class="slide">'
     + bgLayer
     + fallbackSVG
     + splitFallbackSVG
@@ -352,4 +378,4 @@ function buildSlideHTML(slide, imageUrl) {
     + '</div></body></html>';
 }
 
-module.exports = { buildSlideHTML };
+module.exports = { buildSlideHTML }; 
