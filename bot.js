@@ -93,7 +93,7 @@ async function showReferral(chatId) {
     `• Достарыңа осы сілтемені жіберіңіз\n` +
     `• Әр *3 адам* тіркелсе — сізге *1 кредит* қосылады\n` +
     `• Шектеу жоқ — неше адам болса, сонша!\n\n` +
-    `👥 Тіркелген адам: *${user.refEarnings}* | Келесі кредит: *${3 - (user.refEarnings % 3)}* адамнан кейін`,
+    `👥 Тіркелген: *${user.refEarnings}* адам\nКелесі кредит үшін: *${3 - (user.refEarnings % 3)}* адам қажет`,
     { parse_mode: 'Markdown', disable_web_page_preview: true, ...MAIN_KEYBOARD }
   );
 }
@@ -322,3 +322,4 @@ initDB()
     console.error('[DB] Init error:', err);
     process.exit(1);
   });
+      
