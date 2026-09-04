@@ -183,7 +183,7 @@ MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
 - body: when present, 2-3 sentences (30-50 words) with clear explanatory content
 - bullets: when present, 3-5 items, each bullet 6-10 words (a clear short phrase, not a single word)
-- stats: 3 stat cards with real numbers and a short 3-5 word label
+- stats: 3 stat cards with real numbers and a short 3-5 word label. value MUST be max 6 characters (e.g. "1 514", "710", "2ч40м", "46%", "$10M"). NEVER write long values like "1.5 млн" or "2 ч 40 мин"
 - Write concise, clear content — not too long, not too short
 - Set unused fields to null`;
 
@@ -197,11 +197,11 @@ async function reviewAndImproveSlides(presentation) {
 
   const system = `You are a senior art director doing visual QC. You ALWAYS respond with valid JSON only. No markdown, no explanation. Just raw JSON.`;
 
-  const user = `Review this presentation JSON and fix visual problems only. Do NOT redesign. Keep same number of slides.
+  const user = `Review this presentation JSON and fix ALL problems. Do NOT redesign. Keep same number of slides.
 
 ${presentationJSON}
 
-Fix only:
+Fix ALL of the following:
 - Text readability over images (fix overlay or textPosition)
 - Title too long (>8 words) → shorten
 - full_background + dark_gradient_left → textPosition must be center_left
@@ -209,6 +209,10 @@ Fix only:
 - Too many bullets (>6) or body sentences (>3) → trim
 - full_background + overlay=none → add dark_gradient_bottom
 - Vague imageQuery → rewrite in English with scene+mood+lighting
+- stat value longer than 6 chars → shorten (e.g. "1.5 млн" to "1.5М", "2 ч 40 мин" to "2ч40м")
+- bullet item longer than 10 words → shorten to 8 words
+- subtitle longer than 25 words → trim
+- body longer than 50 words → trim
 
 Return the full corrected presentation JSON.`;
 
@@ -232,4 +236,4 @@ Return the full corrected presentation JSON.`;
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
 
-  
+                  
