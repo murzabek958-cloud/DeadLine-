@@ -62,16 +62,19 @@ function imagePlacement(imageType, img) {
       return { wrapperCSS: '' };
   }
 }
-function buildFallbackVisual(accent, mood, index) {
+
+// FIX 1: index параметрі кез-келген сан болса да жұмыс істейтін етіп түзету
+function buildFallbackVisual(accent, mood, slideIndex) {
   const a  = accent || '#d4a843';
   const a1 = a + 'cc';
   const a2 = a + '55';
   const a3 = a + '22';
   const a4 = a + '11';
-  const v  = index % 3;
+  // slideIndex кепілдікпен оң бүтін санға айналдыру
+  const safeIndex = Math.max(0, Math.floor(Number(slideIndex) || 0));
+  const v  = safeIndex % 3;
 
   if (v === 0) {
-    // Neural network
     return '<svg width="500" height="500" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;right:-30px;top:10px;z-index:1;opacity:0.8;">'
       + '<circle cx="250" cy="250" r="240" fill="' + a3 + '"/>'
       + '<circle cx="250" cy="250" r="160" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
@@ -95,7 +98,6 @@ function buildFallbackVisual(accent, mood, index) {
   }
 
   if (v === 1) {
-    // Hexagon
     return '<svg width="480" height="480" viewBox="0 0 480 480" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;right:-10px;top:20px;z-index:1;opacity:0.8;">'
       + '<circle cx="240" cy="240" r="230" stroke="' + a3 + '" stroke-width="1" fill="none"/>'
       + '<circle cx="240" cy="240" r="185" stroke="' + a2 + '" stroke-width="1" fill="none"/>'
@@ -111,7 +113,6 @@ function buildFallbackVisual(accent, mood, index) {
       + '</svg>';
   }
 
-  // Orbits
   return '<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;right:-40px;top:0;z-index:1;opacity:0.75;">'
     + '<circle cx="260" cy="260" r="250" fill="' + a3 + '"/>'
     + '<ellipse cx="260" cy="260" rx="210" ry="75" stroke="' + a2 + '" stroke-width="1" fill="none" transform="rotate(-30 260 260)"/>'
@@ -150,20 +151,20 @@ function textPositionCSS(pos, imageType) {
 
 function renderTitle(slide, palette, big) {
   if (!slide.title) return '';
-  return '<h1 style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + (big || '42px') + ';font-weight:700;line-height:1.15;color:' + palette.text + ';letter-spacing:-0.5px;margin:0;">' + slide.title + '</h1>';
+  return '<h1 style="font-family:DejaVu Sans,Arial,sans-serif;font-size:' + (big || '42px') + ';font-weight:700;line-height:1.15;color:' + palette.text + ';letter-spacing:-0.5px;margin:0;">' + slide.title + '</h1>';
 }
 function renderSubtitle(slide, palette) {
   if (!slide.subtitle) return '';
-  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;font-weight:400;line-height:1.55;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.subtitle + '</p>';
+  return '<p style="font-family:DejaVu Sans,Arial,sans-serif;font-size:17px;font-weight:400;line-height:1.55;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.subtitle + '</p>';
 }
 function renderBody(slide, palette) {
   if (!slide.body) return '';
-  return '<p style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:16px;font-weight:400;line-height:1.65;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.body + '</p>';
+  return '<p style="font-family:DejaVu Sans,Arial,sans-serif;font-size:16px;font-weight:400;line-height:1.65;color:' + palette.muted + ';margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">' + slide.body + '</p>';
 }
 function renderEyebrow(slide, accent) {
   const raw = slide.title || 'Overview';
   const label = raw.split(' ').slice(0, 4).join(' ');
-  return '<div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:' + accent + ';margin-bottom:18px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + label + '</div>';
+  return '<div style="font-family:DejaVu Sans,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:' + accent + ';margin-bottom:18px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + label + '</div>';
 }
 function renderDivider(accent) {
   return '<div style="width:52px;height:3px;background:' + accent + ';border-radius:2px;margin-bottom:24px;"></div>';
@@ -174,11 +175,11 @@ function renderQuoteMark(accent) {
 function renderBullets(slide, palette, accent, grid) {
   if (!slide.bullets || !slide.bullets.length) return '';
   const items = slide.bullets.map(function(b) {
-    return '<li style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">▸</span><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:18px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></li>';
+    return '<li style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">&#9656;</span><span style="font-family:DejaVu Sans,Arial,sans-serif;font-size:18px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></li>';
   }).join('');
   if (grid) {
     const gridItems = slide.bullets.map(function(b) {
-      return '<div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></div>';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:DejaVu Sans,Arial,sans-serif;font-size:17px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></div>';
     }).join('');
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;">' + gridItems + '</div>';
   }
@@ -191,7 +192,7 @@ function renderStats(slide, palette, accent) {
   const cards = slide.stats.map(function(s) {
     const padding = useGrid ? '16px 18px' : '22px 28px';
     const fontSize = useGrid ? '32px' : '38px';
-    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
+    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:DejaVu Sans,Arial,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:DejaVu Sans,Arial,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
   }).join('');
   if (useGrid) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;">' + cards + '</div>';
@@ -226,21 +227,25 @@ function renderDecor(d, accent, palette) {
   return '';
 }
 
+// FIX 2: image жоқта overlay мәселесін түзету
 function sanitizeComposition(imageType, overlayType, img) {
   let safeOverlay = overlayType;
+  // Сурет жоқ болса overlay қажет емес
+  if (!img) return 'none';
   if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = 'dark_gradient_bottom';
   if ((imageType === 'right_half' || imageType === 'left_half') && (overlayType === 'dark_full' || overlayType === 'light_full')) safeOverlay = 'none';
   return safeOverlay;
 }
 
-// right_half/left_half слайдтарда бос жақта SVG визуал шығару
-function buildSplitFallbackSVG(accent, side, index) {
+function buildSplitFallbackSVG(accent, side, slideIndex) {
   const a  = accent || '#d4a843';
   const a2 = a + '55';
   const a3 = a + '22';
   const a4 = a + '11';
   const pos = side === 'right' ? 'right:0;' : 'left:0;';
-  const v = index % 3;
+  // FIX 3: slideIndex қауіпсіз есептеу
+  const safeIndex = Math.max(0, Math.floor(Number(slideIndex) || 0));
+  const v = safeIndex % 3;
 
   let svg = '';
   if (v === 0) {
@@ -300,7 +305,7 @@ function buildSplitFallbackSVG(accent, side, index) {
   return '<div style="position:absolute;top:0;' + pos + 'width:52%;height:100%;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">' + svg + '</div>';
 }
 
-function buildSlideHTML(slide, imageUrl) {
+function buildSlideHTML(slide, imageUrl, globalIndex) {
   const comp        = slide.composition || {};
   const imageType   = comp.image        || 'none';
   const overlayType = comp.overlay      || 'none';
@@ -310,10 +315,12 @@ function buildSlideHTML(slide, imageUrl) {
   const accent      = comp.accentColor  || '#d4a843';
   const elements    = comp.elements     || ['title'];
   const decorative  = comp.decorative   || [];
-  const idx         = (slide.index || 1) - 1;
+
+  // FIX 4: index-ті 3 жерден алу: slide.index, globalIndex, немесе 0
+  const rawIndex = slide.index != null ? slide.index : (globalIndex != null ? globalIndex + 1 : 1);
+  const idx = Math.max(0, Math.floor(Number(rawIndex) || 1) - 1);
 
   const palette    = MOOD[mood] || MOOD.dark;
-  // Stat cards бар слайдта сурет керек емес — cards + image = толып кетеді
   const hasStats = slide.stats && slide.stats.length > 0;
   const img = imageUrl || '';
   const safeOverlay = hasStats && img ? 'dark_full' : sanitizeComposition(imageType, overlayType, img);
@@ -324,7 +331,6 @@ function buildSlideHTML(slide, imageUrl) {
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
   const showFallback   = !img && !hasRichContent;
 
-  // right_half / left_half + сурет жоқ → бос жаққа SVG визуал
   const isSplit = imageType === 'right_half' || imageType === 'left_half';
   const splitSide = imageType === 'right_half' ? 'right' : 'left';
   const splitFallbackSVG = !img && isSplit ? buildSplitFallbackSVG(accent, splitSide, idx) : '';
@@ -339,16 +345,16 @@ function buildSlideHTML(slide, imageUrl) {
   const contentHTML = elements.map(function(el) { return renderElement(el, slide, palette, accent, layout); }).join('\n');
   const decorHTML   = decorative.map(function(d) { return renderDecor(d, accent, palette); }).join('\n');
 
-  console.log('[HTML] image:', img ? 'YES' : ('NO (fallback:' + showFallback + ')'));
+  console.log('[HTML] slide idx=' + idx + ' image:', img ? 'YES' : ('NO (fallback:' + showFallback + ')'));
 
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;background:' + palette.bg + ';font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;}</style></head><body><div class="slide">'
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;background:' + palette.bg + ';font-family:DejaVu Sans,Arial,sans-serif;}</style></head><body><div class="slide">'
     + bgLayer
     + fallbackSVG
     + splitFallbackSVG
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
     + decorHTML
     + '<div style="' + textCSS + '">' + contentHTML + '</div>'
-    + '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />'
+    + (LOGO_WHITE ? '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />' : '')
     + '</div></body></html>';
 }
 
