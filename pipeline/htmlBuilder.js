@@ -235,7 +235,9 @@ function sanitizeComposition(imageType, overlayType, img) {
 
   // full_background + сурет бар: overlay міндетті болуы керек
   if (imageType === 'full_background' && img) {
-    if (overlayType === 'none') safeOverlay = 'dark_gradient_bottom';
+    if (overlayType === 'none') safeOverlay = 'dark_gradient_left';
+    // color_wash жеткіліксіз — күшті overlay қою
+    if (overlayType === 'color_wash') safeOverlay = 'dark_gradient_left';
   }
 
   // top_strip / bottom_strip: мәтін суреттің үстінде тұрмайды → overlay не керек емес
@@ -343,6 +345,10 @@ function buildSlideHTML(slide, imageUrl) {
   let effectiveTextPos = textPos;
   if (effectiveImageType === 'right_half' && textPos !== 'left_column')  effectiveTextPos = 'left_column';
   if (effectiveImageType === 'left_half'  && textPos !== 'right_column') effectiveTextPos = 'right_column';
+  // stats/effectiveImageType=none болса split column-ды алып тастау — мәтін толық енде тұрсын
+  if (effectiveImageType === 'none' && (effectiveTextPos === 'left_column' || effectiveTextPos === 'right_column')) {
+    effectiveTextPos = 'center_left';
+  }
 
   const safeOverlay = sanitizeComposition(effectiveImageType, overlayType, img);
   const { wrapperCSS } = imagePlacement(effectiveImageType, img);
