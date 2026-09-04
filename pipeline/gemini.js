@@ -14,7 +14,7 @@ async function groqChat(systemPrompt, userPrompt, label) {
     body: JSON.stringify({
       model: GROQ_MODEL,
       temperature: 0.7,
-      max_tokens: 4096,
+      max_tokens: 8192,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -231,4 +231,5 @@ Return the full corrected presentation JSON.`;
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-    
+
+  
