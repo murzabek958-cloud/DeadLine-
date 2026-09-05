@@ -4,6 +4,20 @@
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL   = 'openai/gpt-oss-120b';
 
+// МАҢЫЗДЫ: Groq тегін деңгейінде БАРЛЫҚ модель үшін минутына тек 6,000
+// токен (TPM) лимиті бар (ITPM+OTPM қосындысы). Бір ғана шақыруда 8-10
+// слайдты толық composition-мен (title+subtitle+body+bullets+stats+8
+// composition өрісі) сұрасақ, шығыс сол шектен асып, модель JSON-ды
+// "қысқартып", соңғы слайдтарды бос/бұзық қалдырады — дәл байқалған
+// "барған сайын нашарлайды" багы.
+//
+// Шешім: презентацияны БІР үлкен шақыру орнына бірнеше КІШІ шақыруға
+// бөлеміз (әр слайд батчы өз алдынша ~6000 токен бюджетімен). Бұл жалпы
+// генерация уақытын ұзартады (20-40 секундтан ~1-2 минутқа), бірақ әр
+// слайд толық сапамен, қысқартусыз шығады — сапа санынан маңыздырақ.
+const MAX_TOKENS_PER_CALL = 6000;
+const SLIDES_PER_BATCH    = 3; // әр батчта неше слайд толық генерацияланады
+
 async function groqChat(systemPrompt, userPrompt, label) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -14,7 +28,7 @@ async function groqChat(systemPrompt, userPrompt, label) {
     body: JSON.stringify({
       model: GROQ_MODEL,
       temperature: 0.7,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS_PER_CALL,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -31,7 +45,6 @@ async function groqChat(systemPrompt, userPrompt, label) {
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content || '';
 
-  // Токен логы
   if (data.usage) {
     console.log(`[Tokens] ${label} — input: ${data.usage.prompt_tokens}, output: ${data.usage.completion_tokens}, total: ${data.usage.total_tokens}`);
   }
@@ -118,55 +131,7 @@ function styleGuide(style) {
   }
 }
 
-// ─── 1. Generate ─────────────────────────────────────────────────────────
-async function generateSlides(topic, options = {}) {
-  const slideCount = options.slideCount || null;
-  const language   = options.language   || null;
-  const style      = options.style      || null;
-
-  const slideCountRule = slideCount
-    ? `Generate EXACTLY ${slideCount} slides.`
-    : `Generate 7 to 10 slides.`;
-
-  const languageRule = language
-    ? `Write ALL text in ${language}. Title, subtitle, body, bullets — everything in ${language}.`
-    : `Write content in the same language as the topic.`;
-
-  const system = `You are a professional presentation designer. You ALWAYS respond with valid JSON only. No markdown, no explanation, no code blocks. Just raw JSON.`;
-
-  const user = `Create a presentation on: "${topic}".
-
-${slideCountRule}
-${styleGuide(style)}
-${languageRule}
-
-Return this JSON structure:
-{
-  "title": "Presentation title",
-  "slides": [
-    {
-      "index": 1,
-      "title": "...",
-      "subtitle": "...",
-      "body": "...",
-      "bullets": ["...", "..."],
-      "stats": [{ "value": "...", "label": "..." }],
-      "imageQuery": "English photographic query with scene, mood, lighting",
-      "composition": {
-        "image": "full_background",
-        "overlay": "dark_gradient_left",
-        "textPosition": "center_left",
-        "layout": "single_column",
-        "mood": "dark",
-        "accentColor": "#d4a843",
-        "elements": ["eyebrow", "title", "divider", "subtitle"],
-        "decorative": ["accent_line_left", "corner_circle"]
-      }
-    }
-  ]
-}
-
-RULES:
+const COMPOSITION_RULES = `RULES:
 - composition.image: "full_background" "right_half" "left_half" "top_strip" "bottom_strip" "corner_accent" "none"
 - composition.overlay: "none" "dark_gradient_left" "dark_gradient_right" "dark_gradient_bottom" "dark_full" "light_full" "color_wash"
 - composition.textPosition: "center" "center_left" "center_right" "top_left" "top_center" "bottom_left" "bottom_center" "left_column" "right_column"
@@ -174,12 +139,11 @@ RULES:
 - composition.mood: "dark" "light" "warm" "cold" "vivid"
 - composition.elements: "eyebrow" "title" "subtitle" "divider" "body" "bullets" "stats" "quote_mark"
 - composition.decorative: "accent_line_left" "accent_line_right" "corner_circle" "bottom_rule" "grid_dots"
-- Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
-- Last slide: closing — summary slide with 3-5 conclusion bullets
-- Each slide must have different composition
-- imageQuery: English only, specific, photographic
+- CRITICAL: "corner_accent" only occupies the bottom-right 38%x55% of the slide — it is a SMALL decorative image, not a background. NEVER use "corner_accent" on a slide that has 4+ bullets, a title, AND a subtitle together. Reserve "corner_accent" only for light content: title + subtitle + at most 2 short bullets, OR title + body only.
+- CRITICAL: if this slide has 2+ stats, do NOT use "right_half" or "left_half" — those give stats only ~48% width and cards will overflow. Use "full_background" or "none" instead.
+- imageQuery: English only, specific, photographic`;
 
-MANDATORY CONTENT RULES:
+const CONTENT_RULES = `MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
 - body: when present, 2-3 sentences (30-50 words) with clear explanatory content
 - bullets: when present, 3-5 items, each bullet 6-10 words (a clear short phrase, not a single word)
@@ -187,19 +151,169 @@ MANDATORY CONTENT RULES:
 - Write concise, clear content — not too long, not too short
 - Set unused fields to null`;
 
-  const text = await withRetry(() => groqChat(system, user, 'generateSlides'), 'generateSlides');
-  return parseJSON(text);
+const SLIDE_JSON_SHAPE = `{
+  "index": 1,
+  "title": "...",
+  "subtitle": "...",
+  "body": "...",
+  "bullets": ["...", "..."],
+  "stats": [{ "value": "...", "label": "..." }],
+  "imageQuery": "English photographic query with scene, mood, lighting",
+  "composition": {
+    "image": "full_background",
+    "overlay": "dark_gradient_left",
+    "textPosition": "center_left",
+    "layout": "single_column",
+    "mood": "dark",
+    "accentColor": "#d4a843",
+    "elements": ["eyebrow", "title", "divider", "subtitle"],
+    "decorative": ["accent_line_left", "corner_circle"]
+  }
+}`;
+
+// ─── 0. Outline — жеңіл шақыру, тек жоспар (title + әр слайдтың тақырыбы) ──
+// Бұл шақыру кішкентай (~300-500 токен шығыс), сондықтан TPM лимитіне
+// қатысты тәуекел жоқ. Мақсаты — толық слайдтарды генерациялайтын
+// batch-тарға дәйекті, бір-бірімен байланысты жоспар беру, әйтпесе әр
+// батч тақырыпты басынан бастап "ойлап табады" да, слайдтар арасында
+// логикалық сабақтастық болмайды.
+async function generateOutline(topic, slideCount, language) {
+  const languageRule = language
+    ? `Write in ${language}.`
+    : `Write in the same language as the topic.`;
+
+  const system = `You are a presentation structure planner. You ALWAYS respond with valid JSON only. No markdown, no explanation.`;
+
+  const user = `Plan the structure for a presentation on: "${topic}".
+
+Generate exactly ${slideCount} slides. ${languageRule}
+Slide 1 must be a cover/intro slide. The last slide must be a closing/summary slide.
+
+Return ONLY this JSON:
+{
+  "title": "Overall presentation title",
+  "slideTopics": ["Slide 1 short topic", "Slide 2 short topic", ...]
 }
 
-// ─── 2. Review & Improve ─────────────────────────────────────────────────
-async function reviewAndImproveSlides(presentation) {
-  const presentationJSON = JSON.stringify(presentation, null, 2);
+Each slideTopics entry is a short 3-6 word description of what that slide covers — just enough to guide detailed content generation later. Ensure logical flow from slide to slide (intro → concepts → details → applications → conclusion, or similar).`;
+
+  const text = await withRetry(() => groqChat(system, user, 'generateOutline'), 'generateOutline');
+  const parsed = parseJSON(text);
+
+  if (!parsed?.slideTopics || !Array.isArray(parsed.slideTopics)) {
+    throw new Error('Outline missing slideTopics array');
+  }
+
+  return parsed;
+}
+
+// ─── 1. Generate one batch of fully-detailed slides ────────────────────────
+// batchTopics: [{ index, topic }] — осы батчта генерацияланатын слайдтар.
+// allTopics: толық тізім — модельге жалпы контекст беру үшін (тек атаулар,
+// толық мазмұн емес, сондықтан токен шығыны аз).
+async function generateSlideBatch(presentationTitle, allTopics, batchTopics, style, language) {
+  const languageRule = language
+    ? `Write ALL text in ${language}. Title, subtitle, body, bullets — everything in ${language}.`
+    : `Write content in the same language as the topic.`;
+
+  const system = `You are a professional presentation designer. You ALWAYS respond with valid JSON only. No markdown, no explanation, no code blocks. Just raw JSON.`;
+
+  const contextList = allTopics.map((t, i) => `${i + 1}. ${t}`).join('\n');
+  const batchList = batchTopics.map(b => `Slide ${b.index}: ${b.topic}`).join('\n');
+  const isFirstBatch = batchTopics[0].index === 1;
+  const isLastBatch = batchTopics[batchTopics.length - 1].index === allTopics.length;
+
+  const coverRule = isFirstBatch
+    ? `Slide 1 is the COVER slide: full_background, strong overlay, large title + subtitle (2-3 sentences introducing "${presentationTitle}").`
+    : '';
+  const closingRule = isLastBatch
+    ? `The LAST slide in this batch (slide ${allTopics.length}) is the CLOSING slide: summary with 3-5 conclusion bullets.`
+    : '';
+
+  const user = `You are writing slides for the presentation "${presentationTitle}".
+
+Full presentation outline (for context only — you are generating just the slides listed below):
+${contextList}
+
+Generate DETAILED, FULLY-FORMED content for ONLY these slides:
+${batchList}
+
+${coverRule}
+${closingRule}
+${styleGuide(style)}
+${languageRule}
+
+Return this JSON structure:
+{
+  "slides": [
+    ${SLIDE_JSON_SHAPE}
+  ]
+}
+
+The "slides" array must contain EXACTLY ${batchTopics.length} entries, with "index" matching: ${batchTopics.map(b => b.index).join(', ')}.
+
+${COMPOSITION_RULES}
+- Each slide must have different composition from the others in this batch.
+
+${CONTENT_RULES}`;
+
+  const text = await withRetry(() => groqChat(system, user, `generateBatch[${batchTopics.map(b=>b.index).join(',')}]`), 'generateBatch');
+  const parsed = parseJSON(text);
+
+  if (!parsed?.slides || !Array.isArray(parsed.slides)) {
+    throw new Error('Batch response missing slides array');
+  }
+
+  return parsed.slides;
+}
+
+// ─── Generate full presentation — outline, then batches, stitched together ─
+async function generateSlides(topic, options = {}) {
+  const slideCount = options.slideCount || 8; // default 7-10 орнына нақты сан, batch есептеу үшін
+  const language   = options.language   || null;
+  const style      = options.style      || null;
+
+  console.log(`[Pipeline] Generating outline for ${slideCount} slides...`);
+  const outline = await generateOutline(topic, slideCount, language);
+  const presentationTitle = outline.title;
+  const slideTopics = outline.slideTopics;
+
+  // Батчтарға бөлу: [1,2,3], [4,5,6], [7,8]
+  const batches = [];
+  for (let i = 0; i < slideTopics.length; i += SLIDES_PER_BATCH) {
+    const batchTopics = slideTopics
+      .slice(i, i + SLIDES_PER_BATCH)
+      .map((topic, j) => ({ index: i + j + 1, topic }));
+    batches.push(batchTopics);
+  }
+
+  console.log(`[Pipeline] Generating ${slideTopics.length} slides in ${batches.length} batches of ~${SLIDES_PER_BATCH}...`);
+
+  const allSlides = [];
+  for (const batchTopics of batches) {
+    const slides = await generateSlideBatch(presentationTitle, slideTopics, batchTopics, style, language);
+    allSlides.push(...slides);
+    console.log(`[Pipeline] Batch done: slides ${batchTopics.map(b => b.index).join(',')}`);
+  }
+
+  // index бойынша сұрыптау (модель ретсіз қайтарса да дұрыс ретте болу үшін)
+  allSlides.sort((a, b) => (a.index || 0) - (b.index || 0));
+
+  return { title: presentationTitle, slides: allSlides };
+}
+
+// ─── 2. Review & Improve — де батчпен, бір слайдтар тобын бір-бірден ──────
+// Толық презентацияны бір review шақыруға жіберу де сол 6000 TPM шегінен
+// асады (8 слайд × толық JSON = үлкен promt). Сондықтан review де сол
+// SLIDES_PER_BATCH өлшемімен бөлінеді.
+async function reviewSlideBatch(slidesBatch) {
+  const batchJSON = JSON.stringify({ slides: slidesBatch }, null, 2);
 
   const system = `You are a senior art director doing visual QC. You ALWAYS respond with valid JSON only. No markdown, no explanation. Just raw JSON.`;
 
-  const user = `Review this presentation JSON and fix visual problems only. Do NOT redesign. Keep same number of slides.
+  const user = `Review these presentation slides and fix visual problems only. Do NOT redesign. Keep the same number of slides and same "index" values.
 
-${presentationJSON}
+${batchJSON}
 
 Fix only:
 - Text readability over images (fix overlay or textPosition)
@@ -209,26 +323,47 @@ Fix only:
 - Too many bullets (>6) or body sentences (>3) → trim
 - full_background + overlay=none → add dark_gradient_bottom
 - Vague imageQuery → rewrite in English with scene+mood+lighting
+- If 2+ stats with right_half/left_half image → change image to full_background
 
-Return the full corrected presentation JSON.`;
+Return the full corrected JSON with the same shape: { "slides": [...] }`;
 
-  const text = await withRetry(() => groqChat(system, user, 'reviewSlides'), 'reviewSlides');
+  const text = await withRetry(() => groqChat(system, user, `reviewBatch[${slidesBatch.map(s=>s.index).join(',')}]`), 'reviewBatch');
 
   let reviewed;
   try {
     reviewed = parseJSON(text);
   } catch {
-    console.warn('[Review] Invalid JSON — using original.');
-    return presentation;
+    console.warn('[Review] Invalid JSON for batch — using original.');
+    return slidesBatch;
   }
 
-  if (!reviewed?.slides || reviewed.slides.length !== presentation.slides.length) {
-    console.warn('[Review] Slide count mismatch — using original.');
-    return presentation;
+  if (!reviewed?.slides || reviewed.slides.length !== slidesBatch.length) {
+    console.warn('[Review] Slide count mismatch in batch — using original.');
+    return slidesBatch;
   }
 
-  return reviewed;
+  return reviewed.slides;
+}
+
+async function reviewAndImproveSlides(presentation) {
+  const slides = presentation.slides;
+  const batches = [];
+  for (let i = 0; i < slides.length; i += SLIDES_PER_BATCH) {
+    batches.push(slides.slice(i, i + SLIDES_PER_BATCH));
+  }
+
+  console.log(`[Pipeline] Reviewing ${slides.length} slides in ${batches.length} batches...`);
+
+  const allReviewed = [];
+  for (const batch of batches) {
+    const reviewed = await reviewSlideBatch(batch);
+    allReviewed.push(...reviewed);
+  }
+
+  allReviewed.sort((a, b) => (a.index || 0) - (b.index || 0));
+
+  return { ...presentation, slides: allReviewed };
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-
+    
