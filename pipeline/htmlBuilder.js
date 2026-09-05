@@ -220,12 +220,22 @@ function renderStats(slide, palette, accent) {
   if (!slide.stats || !slide.stats.length) return '';
   const count = slide.stats.length;
   const useGrid = count >= 4;
+  const cardCount = slide.stats.length;
   const cards = slide.stats.map(function(s) {
     const padding = useGrid ? '16px 18px' : '22px 28px';
-    const fontSize = useGrid ? '32px' : '38px';
+    const valueStr = String(s.value || '');
+
+    // Санның ұзындығына ЖӘНЕ карточка санына қарай font-size динамикалық есептеледі.
+    // Мысалы "12 мм сынап бағ." секілді ұзын мән 5-карточкалы қатарда кесіліп қалмас үшін
+    // ұзындығы 6 таңбадан асса — кішірейтеміз, 10 таңбадан асса — тағы да кішірейтеміз.
+    let fontSize = useGrid ? 32 : 38;
+    if (cardCount >= 4) fontSize -= 4;           // тар карточка — алдын ала кішірек
+    if (valueStr.length > 6)  fontSize -= 4;
+    if (valueStr.length > 10) fontSize -= 4;
+    fontSize = Math.max(fontSize, 18);            // ешқашан 18px-тен кіші болмайды
+
     // backdrop-filter — фонда сурет тұрса да карточка оқылатындай ажыратады.
-    // Қолдамайтын рендерерлерде де palette.surface + border өзі жеткілікті контраст береді.
-    return '<div style="background:' + palette.surface + ';backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid ' + accent + '33;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
+    return '<div style="background:' + palette.surface + ';backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid ' + accent + '33;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + 'px;font-weight:700;color:' + accent + ';line-height:1.1;margin-bottom:8px;overflow-wrap:break-word;word-break:break-word;">' + valueStr + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
   }).join('');
   if (useGrid) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;">' + cards + '</div>';
@@ -413,6 +423,23 @@ function buildSlideHTML(slide, imageUrl) {
   const hasOverlay = img && safeOverlay !== 'none';
   const textCSS    = textPositionCSS(textPos, imageType);
 
+  // Кепілдендірілген контраст: сурет мәтін аймағының ТУРА астында жатса
+  // (full_background/top_strip/bottom_strip/corner_accent — яғни фонды
+  // толығымен немесе ішінара алатын layout-тар), тек overlay-ге сену
+  // жеткіліксіз — суреттің нақты жарықтығы алдын ала белгісіз (ашық аспан,
+  // сұр қабырға, т.б. болуы мүмкін). Сондықтан мәтінге әрдайым жұмсақ
+  // text-shadow қосамыз — қараңғы да, ашық та фонда әріп контурын ұстап
+  // тұрады, палитра/сурет реңкіне тәуелсіз жұмыс істейді.
+  const BACKGROUND_HEAVY = ['full_background', 'top_strip', 'bottom_strip', 'corner_accent'];
+  const needsTextShadow = img && BACKGROUND_HEAVY.indexOf(imageType) !== -1;
+  const textShadowCSS = needsTextShadow
+    ? (palette.text === '#1a1a1a'
+        // light-mood мәтін қара болғанда — ашық сурет үстінде ақ "гало" контур
+        ? 'text-shadow:0 1px 3px rgba(255,255,255,0.9),0 0 12px rgba(255,255,255,0.5);'
+        // қалған барлық mood-та мәтін ашық түсті — қараңғы гало контур
+        : 'text-shadow:0 1px 3px rgba(0,0,0,0.85),0 0 16px rgba(0,0,0,0.5);')
+    : '';
+
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
   const showFallback   = !img && !hasRichContent;
 
@@ -441,7 +468,7 @@ function buildSlideHTML(slide, imageUrl) {
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
     + seamHTML
     + decorHTML
-    + '<div style="' + textCSS + '">' + contentHTML + '</div>'
+    + '<div style="' + textCSS + textShadowCSS + '">' + contentHTML + '</div>'
     + '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />'
     + '</div></body></html>';
 }
