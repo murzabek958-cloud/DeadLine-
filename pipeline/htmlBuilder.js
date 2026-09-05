@@ -140,13 +140,19 @@ function textPositionCSS(pos, imageType) {
 
   const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
 
-  // corner_accent: сурет оң төменгі бұрышта (38% ені, 55% биіктігі) —
-  // мәтін сол аймаққа кірмес үшін ені де, орны да тарылтылады.
+  // corner_accent: сурет оң төменгі бұрышта (bottom:0;right:0;width:38%;height:55%) —
+  // яғни слайд биіктігінің 720px-тің 396px-і (55%) СУРЕТ, демек сурет
+  // top:324px-тен (720×0.45) басталады. Мазмұн көп болса (title+subtitle+
+  // 5 bullet) тік мәтін блогы сол шектен асып, суреттің үстіне кіріп кетеді.
+  // Сондықтан ені ЖӘНЕ биіктігі де шектеледі: max-height мазмұнды 324px-тен
+  // аспайтындай ұстайды, артық bullet болса overflow:hidden арқылы жасырылады
+  // (толық мазмұн prompt деңгейінде шектелгендіктен бұл сирек іске қосылады,
+  // бірақ кепілдік ретінде қалады).
   if (imageType === 'corner_accent') {
     switch (pos) {
-      case 'top_center': return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;max-width:600px';
+      case 'top_center': return shared + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;max-width:600px;max-height:260px;overflow:hidden';
       case 'top_left':
-      default:           return shared + 'top:64px;left:80px;max-width:560px';
+      default:           return shared + 'top:56px;left:80px;max-width:560px;max-height:260px;overflow:hidden';
     }
   }
 
@@ -396,7 +402,7 @@ function buildSplitFallbackSVG(accent, side, index) {
 
 function buildSlideHTML(slide, imageUrl) {
   const comp        = slide.composition || {};
-  const imageType   = comp.image        || 'none';
+  const rawImageType = comp.image       || 'none';
   const overlayType = comp.overlay      || 'none';
   const rawTextPos  = comp.textPosition || 'center_left';
   const layout      = comp.layout       || 'single_column';
@@ -409,6 +415,19 @@ function buildSlideHTML(slide, imageUrl) {
   const palette  = MOOD[mood] || MOOD.dark;
   const hasStats = slide.stats   && slide.stats.length   > 0;
   const img      = imageUrl || '';
+
+  // Kepildik: "corner_accent" тек 38%x55% кіші декоративті сурет —
+  // көп мазмұн (title+subtitle+3+ bullets секілді) болса, тік мәтін блогы
+  // сол шағын аймақтан асып, суреттің үстіне кіріп кетеді (нақты байқалған
+  // баг). Prompt деңгейінде модельге ескерту берілді, бірақ ол әрдайым
+  // орындала бермейді, сондықтан мұнда да сақтандырамыз: мазмұн ауыр болса,
+  // corner_accent автоматты full_background-қа ауысады — сурет үлкейеді,
+  // мәтінге орын жеткілікті болады.
+  const bulletCount   = (slide.bullets && slide.bullets.length) || 0;
+  const hasSubtitle   = !!slide.subtitle;
+  const hasBody       = !!slide.body;
+  const isContentHeavy = bulletCount >= 3 || (hasSubtitle && hasBody) || (hasSubtitle && bulletCount >= 2);
+  const imageType = (rawImageType === 'corner_accent' && isContentHeavy) ? 'full_background' : rawImageType;
 
   // Stat cards бар слайдта сурет болса — толық қараңғы overlay,
   // әйтпесе карточка мен сурет бір-бірімен араласып, оқылмай қалады.
