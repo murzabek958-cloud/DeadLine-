@@ -177,7 +177,7 @@ RULES:
 - Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
 - Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
-- imageQuery: English only, 3-5 words, abstract landscape or nature scene only. Example: "misty mountain sunrise", "dark forest fog", "ocean waves dusk", "glacier blue ice". NO animals, NO people, NO city names, NO country names. Stats slides: imageQuery=null, image="none"
+- imageQuery: English only, 3-5 words describing a scene RELEVANT to the slide topic. Must be a photographic landscape or abstract scene. NO animals, NO people, NO city/country names. Stats slides: imageQuery=null and image="none"
 
 MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
@@ -232,4 +232,4 @@ Return the full corrected presentation JSON.`;
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
 
-                                                                           
+    
