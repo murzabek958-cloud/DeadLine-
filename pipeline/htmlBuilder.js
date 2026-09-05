@@ -31,6 +31,10 @@ function overlayCSS(type, accent) {
       return 'background:linear-gradient(270deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.80) 45%,rgba(0,0,0,0.35) 70%,rgba(0,0,0,0.06) 100%)';
     case 'dark_gradient_bottom':
       return 'background:linear-gradient(180deg,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.75) 100%)';
+    case 'dark_gradient_top':
+      // dark_gradient_bottom-мен айна-теңдес — мәтін ЖОҒАРЫДА тұрғанда
+      // (top_left/top_center) қолданылады, жоғарғы жиекті қараңғылайды.
+      return 'background:linear-gradient(0deg,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.75) 100%)';
     case 'dark_full':
       return 'background:rgba(0,0,0,0.62)';
     case 'light_full':
@@ -138,7 +142,13 @@ function textPositionCSS(pos, imageType) {
     return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:52%;padding:64px 80px 64px 56px';
   }
 
+  // bullets/stats — flex-негізді ішкі элементтер, олар text-align:center
+  // мұрасын елемейді (flex-context center-ды сыртқы блокқа ғана береді,
+  // <li> өзі flex болғандықтан сол жақтан бастай береді). Сондықтан
+  // center/top_center/bottom_center кезінде де контейнерге align-items:center
+  // қосамыз — bullet иконкасы + мәтін бірге, блок ретінде центрде тұрады.
   const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
+  const sharedCentered = shared + 'align-items:center;';
 
   // corner_accent: сурет оң төменгі бұрышта (bottom:0;right:0;width:38%;height:55%) —
   // яғни слайд биіктігінің 720px-тің 396px-і (55%) СУРЕТ, демек сурет
@@ -150,7 +160,7 @@ function textPositionCSS(pos, imageType) {
   // бірақ кепілдік ретінде қалады).
   if (imageType === 'corner_accent') {
     switch (pos) {
-      case 'top_center': return shared + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;max-width:600px;max-height:260px;overflow:hidden';
+      case 'top_center': return sharedCentered + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;max-width:600px;max-height:260px;overflow:hidden';
       case 'top_left':
       default:           return shared + 'top:56px;left:80px;max-width:560px;max-height:260px;overflow:hidden';
     }
@@ -159,7 +169,7 @@ function textPositionCSS(pos, imageType) {
   // top_strip: сурет жоғарғы 38%-ды алады → мәтін тек 40%-дан төмен орналасуы керек
   if (imageType === 'top_strip') {
     switch (pos) {
-      case 'bottom_center': return shared + 'bottom:88px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+      case 'bottom_center': return sharedCentered + 'bottom:88px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
       case 'bottom_left':
       default:              return shared + 'bottom:64px;left:80px;max-width:760px';
     }
@@ -168,20 +178,20 @@ function textPositionCSS(pos, imageType) {
   // bottom_strip: сурет төменгі 35%-ды алады → мәтін тек 40%-ға дейін жоғарыда орналасуы керек
   if (imageType === 'bottom_strip') {
     switch (pos) {
-      case 'top_center': return shared + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+      case 'top_center': return sharedCentered + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
       case 'top_left':
       default:           return shared + 'top:56px;left:80px;max-width:760px';
     }
   }
 
   switch (pos) {
-    case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:75%;max-width:900px';
+    case 'center':        return sharedCentered + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:75%;max-width:900px';
     case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:600px';
     case 'center_right':  return shared + 'top:50%;right:80px;transform:translateY(-50%);text-align:right;max-width:600px';
     case 'top_left':      return shared + 'top:64px;left:80px;max-width:700px';
-    case 'top_center':    return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+    case 'top_center':    return sharedCentered + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
     case 'bottom_left':   return shared + 'bottom:72px;left:80px;max-width:700px';
-    case 'bottom_center': return shared + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+    case 'bottom_center': return sharedCentered + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
     default:              return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:600px';
   }
 }
@@ -298,10 +308,26 @@ const POSITION_FALLBACK = {
   // corner_accent — сурет оң төменде, сондықтан мәтінді жоғарғы сол жаққа шоғырландыру қауіпсіз
   corner_accent: 'top_left',
 };
+// Мәтін позициясы бойынша қай градиент бағыты қауіпсіз екенін анықтайды.
+// Мысалы textPos "top_center" болса, мәтін ЖОҒАРЫДА тұр — оны қараңғылау
+// үшін dark_gradient_bottom (төменнен жоғары қараңғылайтын) ЕМЕС,
+// dark_gradient_top (керісінше) керек. Бағыты сәйкес келмесе, мәтін
+// ашық суретпен тікелей қиылысады — дәл байқалған баг осы еді.
+function overlayForTextPosition(textPos) {
+  if (textPos === 'top_left' || textPos === 'top_center' || textPos === 'top_right') return 'dark_gradient_top';
+  if (textPos === 'bottom_left' || textPos === 'bottom_center' || textPos === 'bottom_right') return 'dark_gradient_bottom';
+  return 'dark_full'; // center/center_left/center_right — мәтін ортада, толық overlay ең сенімдісі
+}
 
 function sanitizeComposition(imageType, overlayType, img, textPos) {
   let safeOverlay = overlayType;
-  if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = 'dark_gradient_bottom';
+
+  // full_background-та overlay мүлде жоқ болса — textPos-қа сай бағыт таңдаймыз,
+  // "әрдайым bottom" деген қатаң ереже орнына.
+  if (imageType === 'full_background' && overlayType === 'none' && img) {
+    safeOverlay = overlayForTextPosition(textPos);
+  }
+
   if ((imageType === 'right_half' || imageType === 'left_half') && (overlayType === 'dark_full' || overlayType === 'light_full')) safeOverlay = 'none';
 
   // top_strip/bottom_strip кезінде де толық overlay керек емес — тек жиек fade жеткілікті
