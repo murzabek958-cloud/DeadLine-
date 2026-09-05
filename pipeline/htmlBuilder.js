@@ -129,15 +129,35 @@ function buildFallbackVisual(accent, mood, index) {
 }
 
 function textPositionCSS(pos, imageType) {
-  // right_half сүреті бар — мәтін сол жаққа (48% ені)
-  if (pos === 'left_column' || (imageType === 'right_half')) {
+  // Split layouts (right_half / left_half) — flex-негізді екі колонка,
+  // мәтін әрдайым сурет жоқ жарты бөлікте орналасады.
+  if (pos === 'left_column' || imageType === 'right_half') {
     return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;width:48%;padding:64px 48px 64px 80px';
   }
-  // left_half сүреті бар — мәтін оң жаққа (52% ені)
-  if (pos === 'right_column' || (imageType === 'left_half')) {
+  if (pos === 'right_column' || imageType === 'left_half') {
     return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:52%;padding:64px 80px 64px 56px';
   }
+
   const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
+
+  // top_strip: сурет жоғарғы 38%-ды алады → мәтін тек 40%-дан төмен орналасуы керек
+  if (imageType === 'top_strip') {
+    switch (pos) {
+      case 'bottom_center': return shared + 'bottom:88px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+      case 'bottom_left':
+      default:              return shared + 'bottom:64px;left:80px;max-width:760px';
+    }
+  }
+
+  // bottom_strip: сурет төменгі 35%-ды алады → мәтін тек 40%-ға дейін жоғарыда орналасуы керек
+  if (imageType === 'bottom_strip') {
+    switch (pos) {
+      case 'top_center': return shared + 'top:56px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+      case 'top_left':
+      default:           return shared + 'top:56px;left:80px;max-width:760px';
+    }
+  }
+
   switch (pos) {
     case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:75%;max-width:900px';
     case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:600px';
@@ -193,7 +213,9 @@ function renderStats(slide, palette, accent) {
   const cards = slide.stats.map(function(s) {
     const padding = useGrid ? '16px 18px' : '22px 28px';
     const fontSize = useGrid ? '32px' : '38px';
-    return '<div style="background:' + palette.surface + ';border:1px solid ' + accent + '22;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
+    // backdrop-filter — фонда сурет тұрса да карточка оқылатындай ажыратады.
+    // Қолдамайтын рендерерлерде де palette.surface + border өзі жеткілікті контраст береді.
+    return '<div style="background:' + palette.surface + ';backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid ' + accent + '33;border-radius:14px;padding:' + padding + ';text-align:center;flex:1;min-width:0;overflow:hidden;"><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:' + fontSize + ';font-weight:700;color:' + accent + ';line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + s.value + '</div><div style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:' + palette.muted + ';word-break:break-word;line-height:1.4;">' + s.label + '</div></div>';
   }).join('');
   if (useGrid) {
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;">' + cards + '</div>';
@@ -228,11 +250,56 @@ function renderDecor(d, accent, palette) {
   return '';
 }
 
-function sanitizeComposition(imageType, overlayType, img) {
+// Әр imageType үшін QIYYLYSPAUY тиіс textPosition-дар тізімі.
+// Position осы тізімде болса — суретпен қиылысады, қауіпсіз позицияға ауыстырамыз.
+const UNSAFE_POSITIONS = {
+  right_half:   ['center', 'center_right', 'top_center', 'bottom_center', 'right_column'],
+  left_half:    ['center', 'center_left',  'top_center', 'bottom_center', 'left_column'],
+  top_strip:    ['top_left', 'top_center', 'center', 'center_left', 'center_right'],
+  bottom_strip: ['bottom_left', 'bottom_center', 'center', 'center_left', 'center_right'],
+  corner_accent:[], // өз алдынша дұрыс — text әдеттегідей центрде қалуы мүмкін, тек оң-төмен бұрышты алып тастайды renderElement жоқ
+};
+
+// Position ауыстырылғанда неге ауысатынын анықтайтын fallback картасы
+const POSITION_FALLBACK = {
+  right_half:   'center_left',
+  left_half:    'center_right',
+  top_strip:    'bottom_left',
+  bottom_strip: 'top_left',
+};
+
+function sanitizeComposition(imageType, overlayType, img, textPos) {
   let safeOverlay = overlayType;
   if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = 'dark_gradient_bottom';
   if ((imageType === 'right_half' || imageType === 'left_half') && (overlayType === 'dark_full' || overlayType === 'light_full')) safeOverlay = 'none';
+
+  // top_strip/bottom_strip кезінде де толық overlay керек емес — тек жиек fade жеткілікті
+  if ((imageType === 'top_strip' || imageType === 'bottom_strip') && overlayType === 'dark_full') safeOverlay = 'none';
+
   return safeOverlay;
+}
+
+// top_strip/bottom_strip слайдтарда мәтін орналасатын аймақ (фон түсі) мен
+// сурет-маска жиегінің түйісуінде жұқа градиент қажет — олай болмаса
+// сурет пен фонның шекарасы қатаң сызық болып көрінеді.
+function stripSeamCSS(imageType, palette) {
+  if (imageType === 'top_strip') {
+    return '<div style="position:absolute;top:0;left:0;right:0;height:38%;z-index:1;background:linear-gradient(180deg,transparent 60%,' + palette.bg + ' 100%);"></div>';
+  }
+  if (imageType === 'bottom_strip') {
+    return '<div style="position:absolute;bottom:0;left:0;right:0;height:35%;z-index:1;background:linear-gradient(0deg,transparent 60%,' + palette.bg + ' 100%);"></div>';
+  }
+  return '';
+}
+
+// textPosition суретпен қиылысатын болса — қауіпсіз позицияға ауыстыру
+function sanitizeTextPosition(imageType, textPos, img) {
+  if (!img) return textPos; // сурет жоқ болса — қиылысу қаупі жоқ
+  const unsafe = UNSAFE_POSITIONS[imageType];
+  if (unsafe && unsafe.indexOf(textPos) !== -1) {
+    return POSITION_FALLBACK[imageType] || textPos;
+  }
+  return textPos;
 }
 
 // right_half/left_half слайдтарда бос жақта SVG визуал шығару
@@ -306,7 +373,7 @@ function buildSlideHTML(slide, imageUrl) {
   const comp        = slide.composition || {};
   const imageType   = comp.image        || 'none';
   const overlayType = comp.overlay      || 'none';
-  const textPos     = comp.textPosition || 'center_left';
+  const rawTextPos  = comp.textPosition || 'center_left';
   const layout      = comp.layout       || 'single_column';
   const mood        = comp.mood         || 'dark';
   const accent      = comp.accentColor  || '#d4a843';
@@ -314,11 +381,19 @@ function buildSlideHTML(slide, imageUrl) {
   const decorative  = comp.decorative   || [];
   const idx         = (slide.index || 1) - 1;
 
-  const palette    = MOOD[mood] || MOOD.dark;
-  // Stat cards бар слайдта сурет керек емес — cards + image = толып кетеді
-  const hasStats = slide.stats && slide.stats.length > 0;
-  const img = imageUrl || '';
-  const safeOverlay = hasStats && img ? 'dark_full' : sanitizeComposition(imageType, overlayType, img);
+  const palette  = MOOD[mood] || MOOD.dark;
+  const hasStats = slide.stats   && slide.stats.length   > 0;
+  const img      = imageUrl || '';
+
+  // Stat cards бар слайдта сурет болса — толық қараңғы overlay,
+  // әйтпесе карточка мен сурет бір-бірімен араласып, оқылмай қалады.
+  const safeOverlay = hasStats && img ? 'dark_full' : sanitizeComposition(imageType, overlayType, img, rawTextPos);
+
+  // Мәтін позициясы суретпен қиылысатын болса — автоматты қауіпсіз позицияға ауыстыру.
+  // Мысалы: full_background емес, top_strip кезінде "top_left" сұралса,
+  // текст сурет үстіне мінбей, суреттен төмен орналасады.
+  const textPos = sanitizeTextPosition(imageType, rawTextPos, img);
+
   const { wrapperCSS } = imagePlacement(imageType, img);
   const hasOverlay = img && safeOverlay !== 'none';
   const textCSS    = textPositionCSS(textPos, imageType);
@@ -340,14 +415,16 @@ function buildSlideHTML(slide, imageUrl) {
 
   const contentHTML = elements.map(function(el) { return renderElement(el, slide, palette, accent, layout); }).join('\n');
   const decorHTML   = decorative.map(function(d) { return renderDecor(d, accent, palette); }).join('\n');
+  const seamHTML    = img ? stripSeamCSS(imageType, palette) : '';
 
-  console.log('[HTML] image:', img ? 'YES' : ('NO (fallback:' + showFallback + ')'));
+  console.log('[HTML] image:', img ? 'YES' : ('NO (fallback:' + showFallback + ')'), '| composition:', imageType + '/' + textPos + (rawTextPos !== textPos ? ' (auto-corrected from ' + rawTextPos + ')' : ''));
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box;}body{width:1280px;height:720px;overflow:hidden;}.slide{position:relative;width:1280px;height:720px;background:' + palette.bg + ';font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;}</style></head><body><div class="slide">'
     + bgLayer
     + fallbackSVG
     + splitFallbackSVG
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
+    + seamHTML
     + decorHTML
     + '<div style="' + textCSS + '">' + contentHTML + '</div>'
     + '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />'
