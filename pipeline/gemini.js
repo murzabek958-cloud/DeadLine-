@@ -2,7 +2,7 @@
 
 // ─── Groq клиенті (fetch арқылы, SDK орнатпай) ───────────────────────────
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL   = 'llama-3.3-70b-versatile';
+const GROQ_MODEL   = 'openai/gpt-oss-120b';
 
 async function groqChat(systemPrompt, userPrompt, label) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -177,7 +177,7 @@ RULES:
 - Slide 1: cover — full_background, strong overlay, large title + subtitle (2-3 sentences introducing the topic)
 - Last slide: closing — summary slide with 3-5 conclusion bullets
 - Each slide must have different composition
-- imageQuery: English only, specific, photographic
+- imageQuery: English only, 3-5 words, abstract landscape or nature scene only. Example: "misty mountain sunrise", "dark forest fog", "ocean waves dusk", "glacier blue ice". NO animals, NO people, NO city names, NO country names. Stats slides: imageQuery=null, image="none"
 
 MANDATORY CONTENT RULES:
 - subtitle: ALWAYS present, 1-2 sentences (15-25 words) briefly describing the slide
@@ -232,4 +232,4 @@ Return the full corrected presentation JSON.`;
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
 
-        
+                                                                           
