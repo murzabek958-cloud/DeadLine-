@@ -17,7 +17,7 @@ const LOGO_WHITE = getLogoBase64();
 
 const MOOD = {
   dark:  { bg: '#0d1117', text: '#ffffff', muted: 'rgba(255,255,255,0.6)',  surface: 'rgba(255,255,255,0.06)' },
-  light: { bg: '#f5f2ed', text: '#1a1a1a', muted: 'rgba(0,0,0,0.45)',      surface: 'rgba(0,0,0,0.04)' },
+  light: { bg: '#f5f2ed', text: '#1a1a1a', muted: 'rgba(0,0,0,0.70)',      surface: 'rgba(0,0,0,0.06)' },
   warm:  { bg: '#1e1209', text: '#f5e8d0', muted: 'rgba(245,232,208,0.6)', surface: 'rgba(255,255,255,0.06)' },
   cold:  { bg: '#0c1622', text: '#e8f0f8', muted: 'rgba(232,240,248,0.6)', surface: 'rgba(255,255,255,0.07)' },
   vivid: { bg: '#0a0a0a', text: '#ffffff', muted: 'rgba(255,255,255,0.65)', surface: 'rgba(255,255,255,0.08)' },
@@ -26,7 +26,7 @@ const MOOD = {
 function overlayCSS(type, accent) {
   switch (type) {
     case 'dark_gradient_left':
-      return 'background:linear-gradient(90deg,rgba(0,0,0,0.40) 0%,rgba(0,0,0,0.25) 50%,rgba(0,0,0,0.00) 100%)';
+      return 'background:linear-gradient(90deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.80) 45%,rgba(0,0,0,0.40) 70%,rgba(0,0,0,0.08) 100%)';
     case 'dark_gradient_right':
       return 'background:linear-gradient(270deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.80) 45%,rgba(0,0,0,0.35) 70%,rgba(0,0,0,0.06) 100%)';
     case 'dark_gradient_bottom':
@@ -129,22 +129,24 @@ function buildFallbackVisual(accent, mood, index) {
 }
 
 function textPositionCSS(pos, imageType) {
-  if (pos === 'left_column') {
-    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;width:calc(48% - 0px);max-width:580px;padding:64px 56px 64px 80px';
+  // right_half сүреті бар — мәтін сол жаққа (48% ені)
+  if (pos === 'left_column' || (imageType === 'right_half')) {
+    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;width:48%;padding:64px 48px 64px 80px';
   }
-  if (pos === 'right_column') {
-    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:calc(52% - 0px);padding:64px 72px 64px 56px';
+  // left_half сүреті бар — мәтін оң жаққа (52% ені)
+  if (pos === 'right_column' || (imageType === 'left_half')) {
+    return 'position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:18px;margin-left:48%;width:52%;padding:64px 80px 64px 56px';
   }
-  const shared = 'position:absolute;z-index:2;max-width:700px;display:flex;flex-direction:column;gap:18px;';
+  const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
   switch (pos) {
-    case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%';
-    case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%)';
-    case 'center_right':  return shared + 'top:50%;right:80px;transform:translateY(-50%);text-align:right';
-    case 'top_left':      return shared + 'top:64px;left:80px';
-    case 'top_center':    return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center';
-    case 'bottom_left':   return shared + 'bottom:72px;left:80px';
-    case 'bottom_center': return shared + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center';
-    default:              return shared + 'top:50%;left:80px;transform:translateY(-50%)';
+    case 'center':        return shared + 'top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:75%;max-width:900px';
+    case 'center_left':   return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:600px';
+    case 'center_right':  return shared + 'top:50%;right:80px;transform:translateY(-50%);text-align:right;max-width:600px';
+    case 'top_left':      return shared + 'top:64px;left:80px;max-width:700px';
+    case 'top_center':    return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+    case 'bottom_left':   return shared + 'bottom:72px;left:80px;max-width:700px';
+    case 'bottom_center': return shared + 'bottom:96px;left:50%;transform:translateX(-50%);text-align:center;width:75%;max-width:900px';
+    default:              return shared + 'top:50%;left:80px;transform:translateY(-50%);max-width:600px';
   }
 }
 
@@ -353,3 +355,4 @@ function buildSlideHTML(slide, imageUrl) {
 }
 
 module.exports = { buildSlideHTML };
+    
