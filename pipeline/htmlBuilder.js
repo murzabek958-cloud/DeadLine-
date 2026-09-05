@@ -219,14 +219,28 @@ function renderDivider(accent) {
 function renderQuoteMark(accent) {
   return '<div style="font-family:Georgia,serif;font-size:110px;line-height:0.7;color:' + accent + ';opacity:0.45;margin-bottom:24px;">"</div>';
 }
-function renderBullets(slide, palette, accent, grid) {
+// align: 'left' (default), 'right', немесе 'center'. Title/subtitle секілді
+// text-align арқылы емес — bullets/stats flex-элементтер болғандықтан,
+// text-align мұрагерлігі icon мен мәтіннің РЕТІН ауыстырып жібереді
+// (мысалы text-align:right кезінде bullet ⚬ мәтіннен КЕЙІН қалып қояды).
+// Сондықтан мұнда flex-direction мен text-align-ды бірге, сәйкес басқарамыз.
+function renderBullets(slide, palette, accent, grid, align) {
   if (!slide.bullets || !slide.bullets.length) return '';
+  const isRight  = align === 'right';
+  const isCenter = align === 'center';
+  // row-reverse: icon пен мәтін орны ауысады (icon оң жақта тұрады),
+  // бірақ мәтіннің ӨЗІ дұрыс солдан-оңға оқылады — тек орналасуы айналады.
+  const flexDir   = isRight ? 'row-reverse' : 'row';
+  const itemAlign = isCenter ? 'center' : 'flex-start';
+  const textAlign = isCenter ? 'center' : (isRight ? 'right' : 'left');
+  const justify    = isCenter ? 'justify-content:center;' : '';
+
   const items = slide.bullets.map(function(b) {
-    return '<li style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">▸</span><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:18px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></li>';
+    return '<li style="display:flex;flex-direction:' + flexDir + ';align-items:' + itemAlign + ';' + justify + 'gap:12px;margin-bottom:14px;"><span style="color:' + accent + ';margin-top:3px;flex-shrink:0;font-size:13px;">▸</span><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:18px;line-height:1.55;color:' + palette.text + ';font-weight:400;text-align:' + textAlign + ';">' + b + '</span></li>';
   }).join('');
   if (grid) {
     const gridItems = slide.bullets.map(function(b) {
-      return '<div style="display:flex;align-items:flex-start;gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;line-height:1.55;color:' + palette.text + ';font-weight:400;">' + b + '</span></div>';
+      return '<div style="display:flex;flex-direction:' + flexDir + ';align-items:' + itemAlign + ';' + justify + 'gap:10px;"><div style="width:7px;height:7px;border-radius:50%;background:' + accent + ';flex-shrink:0;margin-top:5px;"></div><span style="font-family:Noto Sans CJK KR,DejaVu Sans,sans-serif;font-size:17px;line-height:1.55;color:' + palette.text + ';font-weight:400;text-align:' + textAlign + ';">' + b + '</span></div>';
     }).join('');
     return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;">' + gridItems + '</div>';
   }
@@ -259,14 +273,14 @@ function renderStats(slide, palette, accent) {
   return '<div style="display:flex;gap:24px;width:100%;">' + cards + '</div>';
 }
 
-function renderElement(el, slide, palette, accent, layout) {
+function renderElement(el, slide, palette, accent, layout, align) {
   switch (el) {
     case 'eyebrow':    return renderEyebrow(slide, accent);
     case 'title':      return renderTitle(slide, palette, layout === 'cover' ? '58px' : '38px');
     case 'subtitle':   return renderSubtitle(slide, palette);
     case 'divider':    return renderDivider(accent);
     case 'body':       return renderBody(slide, palette);
-    case 'bullets':    return renderBullets(slide, palette, accent, layout === 'two_column_bullets');
+    case 'bullets':    return renderBullets(slide, palette, accent, layout === 'two_column_bullets', align);
     case 'stats':      return renderStats(slide, palette, accent);
     case 'quote_mark': return renderQuoteMark(accent);
     default:           return '';
@@ -308,6 +322,7 @@ const POSITION_FALLBACK = {
   // corner_accent — сурет оң төменде, сондықтан мәтінді жоғарғы сол жаққа шоғырландыру қауіпсіз
   corner_accent: 'top_left',
 };
+
 // Мәтін позициясы бойынша қай градиент бағыты қауіпсіз екенін анықтайды.
 // Мысалы textPos "top_center" болса, мәтін ЖОҒАРЫДА тұр — оны қараңғылау
 // үшін dark_gradient_bottom (төменнен жоғары қараңғылайтын) ЕМЕС,
@@ -500,7 +515,13 @@ function buildSlideHTML(slide, imageUrl) {
     : '<div style="position:absolute;inset:0;z-index:0;background:radial-gradient(circle at 80% 20%,' + accent + '22 0,transparent 32%),radial-gradient(circle at 15% 85%,' + accent + '18 0,transparent 35%),linear-gradient(135deg,' + palette.bg + ',#101820);"></div>'
       + '<div style="position:absolute;inset:0;z-index:0;opacity:.12;background-image:linear-gradient(' + accent + '33 1px,transparent 1px),linear-gradient(90deg,' + accent + '33 1px,transparent 1px);background-size:48px 48px;"></div>';
 
-  const contentHTML = elements.map(function(el) { return renderElement(el, slide, palette, accent, layout); }).join('\n');
+  // textPos-тан bullets/stats icon-мәтін бағытын анықтайтын align есептейміз.
+  // *_right позициялары → 'right' (icon оң жақта), 'center' → 'center',
+  // қалғандары (солдан басталатындар) → 'left' (әдепкі, өзгеріссіз).
+  const contentAlign = (textPos === 'center_right' || textPos === 'right_column') ? 'right'
+                      : (textPos === 'center') ? 'center'
+                      : 'left';
+  const contentHTML = elements.map(function(el) { return renderElement(el, slide, palette, accent, layout, contentAlign); }).join('\n');
   const decorHTML   = decorative.map(function(d) { return renderDecor(d, accent, palette); }).join('\n');
   const seamHTML    = img ? stripSeamCSS(imageType, palette) : '';
 
