@@ -140,6 +140,16 @@ function textPositionCSS(pos, imageType) {
 
   const shared = 'position:absolute;z-index:2;display:flex;flex-direction:column;gap:18px;';
 
+  // corner_accent: сурет оң төменгі бұрышта (38% ені, 55% биіктігі) —
+  // мәтін сол аймаққа кірмес үшін ені де, орны да тарылтылады.
+  if (imageType === 'corner_accent') {
+    switch (pos) {
+      case 'top_center': return shared + 'top:64px;left:50%;transform:translateX(-50%);text-align:center;max-width:600px';
+      case 'top_left':
+      default:           return shared + 'top:64px;left:80px;max-width:560px';
+    }
+  }
+
   // top_strip: сурет жоғарғы 38%-ды алады → мәтін тек 40%-дан төмен орналасуы керек
   if (imageType === 'top_strip') {
     switch (pos) {
@@ -253,19 +263,24 @@ function renderDecor(d, accent, palette) {
 // Әр imageType үшін QIYYLYSPAUY тиіс textPosition-дар тізімі.
 // Position осы тізімде болса — суретпен қиылысады, қауіпсіз позицияға ауыстырамыз.
 const UNSAFE_POSITIONS = {
-  right_half:   ['center', 'center_right', 'top_center', 'bottom_center', 'right_column'],
-  left_half:    ['center', 'center_left',  'top_center', 'bottom_center', 'left_column'],
-  top_strip:    ['top_left', 'top_center', 'center', 'center_left', 'center_right'],
-  bottom_strip: ['bottom_left', 'bottom_center', 'center', 'center_left', 'center_right'],
-  corner_accent:[], // өз алдынша дұрыс — text әдеттегідей центрде қалуы мүмкін, тек оң-төмен бұрышты алып тастайды renderElement жоқ
+  right_half:    ['center', 'center_right', 'top_center', 'bottom_center', 'right_column'],
+  left_half:     ['center', 'center_left',  'top_center', 'bottom_center', 'left_column'],
+  top_strip:     ['top_left', 'top_center', 'center', 'center_left', 'center_right'],
+  bottom_strip:  ['bottom_left', 'bottom_center', 'center', 'center_left', 'center_right'],
+  // corner_accent: сурет оң ТӨМЕНГІ бұрышта (bottom:0;right:0;width:38%;height:55%).
+  // "center" секілді кең позициялар (max-width:900px) сол аймаққа кіріп кетеді —
+  // сондықтан center/center_right/bottom_center/bottom_right де осында қауіпсіз емес.
+  corner_accent: ['center', 'center_right', 'bottom_center', 'bottom_right', 'top_center'],
 };
 
 // Position ауыстырылғанда неге ауысатынын анықтайтын fallback картасы
 const POSITION_FALLBACK = {
-  right_half:   'center_left',
-  left_half:    'center_right',
-  top_strip:    'bottom_left',
-  bottom_strip: 'top_left',
+  right_half:    'center_left',
+  left_half:     'center_right',
+  top_strip:     'bottom_left',
+  bottom_strip:  'top_left',
+  // corner_accent — сурет оң төменде, сондықтан мәтінді жоғарғы сол жаққа шоғырландыру қауіпсіз
+  corner_accent: 'top_left',
 };
 
 function sanitizeComposition(imageType, overlayType, img, textPos) {
@@ -432,4 +447,3 @@ function buildSlideHTML(slide, imageUrl) {
 }
 
 module.exports = { buildSlideHTML };
-    
