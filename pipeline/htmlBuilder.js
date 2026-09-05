@@ -26,7 +26,7 @@ const MOOD = {
 function overlayCSS(type, accent) {
   switch (type) {
     case 'dark_gradient_left':
-      return 'background:linear-gradient(90deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.80) 45%,rgba(0,0,0,0.40) 70%,rgba(0,0,0,0.08) 100%)';
+      return 'background:linear-gradient(90deg,rgba(0,0,0,0.40) 0%,rgba(0,0,0,0.25) 50%,rgba(0,0,0,0.00) 100%)';
     case 'dark_gradient_right':
       return 'background:linear-gradient(270deg,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.80) 45%,rgba(0,0,0,0.35) 70%,rgba(0,0,0,0.06) 100%)';
     case 'dark_gradient_bottom':
@@ -228,7 +228,7 @@ function renderDecor(d, accent, palette) {
 
 function sanitizeComposition(imageType, overlayType, img) {
   let safeOverlay = overlayType;
-  if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = overlayType;
+  if (imageType === 'full_background' && overlayType === 'none' && img) safeOverlay = 'dark_gradient_bottom';
   if ((imageType === 'right_half' || imageType === 'left_half') && (overlayType === 'dark_full' || overlayType === 'light_full')) safeOverlay = 'none';
   return safeOverlay;
 }
