@@ -15,8 +15,20 @@ const GROQ_MODEL   = 'openai/gpt-oss-120b';
 // бөлеміз (әр слайд батчы өз алдынша ~6000 токен бюджетімен). Бұл жалпы
 // генерация уақытын ұзартады (20-40 секундтан ~1-2 минутқа), бірақ әр
 // слайд толық сапамен, қысқартусыз шығады — сапа санынан маңыздырақ.
-const MAX_TOKENS_PER_CALL = 6000;
-const SLIDES_PER_BATCH    = 3; // әр батчта неше слайд толық генерацияланады
+// МАҢЫЗДЫ: 6000 TPM лимиті INPUT+OUTPUT қосындысына қолданылады, тек
+// output-қа емес. Алдында max_tokens:6000 қойылған — бұл output шегі
+// ғана, ал input (system+user prompt, әсіресе review-де толық слайд
+// JSON-ы ~2000-3000 токен) осыған үстеледі. Нәтижесінде бір шақырудың
+// өзі 8000-9000 токенге жетіп, TPM лимитін бірден асырып, 429 қатесін
+// қайта-қайта тудыратын — дәл байқалған "рейт лимит қайталанып тұр" багы.
+// 3500 — типтік input (~2000-2500 токен, 3 слайдты сипаттауға) үшін
+// жеткілікті орын қалдыратын, әрі output-тың өзі де толық composition-мен
+// 3 слайдты сипаттауға жететін мән.
+const MAX_TOKENS_PER_CALL = 3500;
+// 3-тен 2-ге азайтылды: 3500 output + ~1500-2000 input 3 слайдпен
+// 6000 TPM шегіне тым жақын тұрады (риск әлі бар). 2 слайд — input та,
+// output та азырақ, TPM шегінен қауіпсіз қашықтықта тұрады.
+const SLIDES_PER_BATCH    = 2;
 
 async function groqChat(systemPrompt, userPrompt, label) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -366,4 +378,4 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-    
+        
