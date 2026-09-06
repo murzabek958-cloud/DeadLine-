@@ -505,13 +505,16 @@ function buildSlideHTML(slide, imageUrl) {
   const hasOverlay = img && safeOverlay !== 'none';
   const textCSS    = textPositionCSS(textPos, imageType);
 
-  // Кепілдендірілген контраст: сурет БАР жерде мәтін тұрса — тек overlay-ге
-  // сену жеткіліксіз (суреттің нақты жарықтығы алдын ала белгісіз, әрі
-  // модель кейде "бар-бірақ-әлсіз" overlay қайтарады). Бұрын тек 4 layout
-  // түріне (full_background/top_strip/bottom_strip/corner_accent) шектелген
-  // еді, бірақ right_half/left_half секілді split-layout-тарда да мәтін
-  // сурет жиегіне жақын тұрғанда контраст жетіспейтіні байқалды —
-  // сондықтан енді СУРЕТІ БАР кез келген композицияда text-shadow қосылады.
+  // Кепілдендірілген контраст, ЕКІ ҚАБАТ:
+  // 1) text-shadow — жеңіл, әрдайым қосылады, әдеттегі суретте жеткілікті.
+  // 2) backdrop панелі — ТОЛЫҚ жартылай мөлдір фон, мәтін блогының өзіне
+  //    (сыртқы overlay-ге емес) тікелей қосылады. Бұл КЕПІЛДІ жұмыс істейді,
+  //    себебі сурет қаншалықты "шулы" болса да (мыс: Unsplash-тан "periodic
+  //    table" суреті — өз мәтіні, сандары бар күрделі фото — нақты байқалған
+  //    "екі текст қабаты араласып кеткен" багы), backdrop оның үстін ЖАУЫП
+  //    тастайды, ал text-shadow мұндай жағдайда жеткіліксіз (тек 1-3px контур).
+  //    Padding қосамыз, сонда backdrop мәтіннен сәл үлкенірек болып, "карточка"
+  //    секілді көрінеді — дизайнды бұзбайды, керісінше құрылымдық көрінеді.
   const needsTextShadow = !!img;
   const textShadowCSS = needsTextShadow
     ? (palette.text === '#1a1a1a'
@@ -519,6 +522,22 @@ function buildSlideHTML(slide, imageUrl) {
         ? 'text-shadow:0 1px 3px rgba(255,255,255,0.9),0 0 12px rgba(255,255,255,0.5);'
         // қалған барлық mood-та мәтін ашық түсті — қараңғы гало контур
         : 'text-shadow:0 1px 3px rgba(0,0,0,0.85),0 0 16px rgba(0,0,0,0.5);')
+    : '';
+
+  // Backdrop СУРЕТ бар және мәтін оның үстінде тұратын layout түрлерінде
+  // ӘРДАЙЫМ қосылады — overlay түріне ТӘУЕЛСІЗ. Бастапқыда "safeOverlay !==
+  // dark_full" шарты болған, бірақ бұл ҚАТЕ еді: dark_full өзі небары 62%
+  // қараңғылық береді, ал "шулы" сурет (мыс: Unsplash-тан "periodic table" —
+  // өз мәтіні, сандары бар фото) үстінде bullets/subtitle секілді ұсақ
+  // мәтін әлі де контраст жетіспей қалады (дәл байқалған баг). Backdrop —
+  // ЕҢ СОҢҒЫ, ең сенімді қорғаныс қабаты, сондықтан overlay бар-жоғына
+  // қарамастан қосылады.
+  const BACKDROP_LAYOUTS = ['full_background', 'top_strip', 'bottom_strip', 'corner_accent'];
+  const needsBackdrop = img && BACKDROP_LAYOUTS.indexOf(imageType) !== -1;
+  const backdropCSS = needsBackdrop
+    ? (palette.text === '#1a1a1a'
+        ? 'background:rgba(255,255,255,0.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:16px;padding:28px 36px;margin:-28px -36px;'
+        : 'background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:16px;padding:28px 36px;margin:-28px -36px;')
     : '';
 
   const hasRichContent = (slide.stats && slide.stats.length > 0) || (slide.bullets && slide.bullets.length > 0);
@@ -555,7 +574,7 @@ function buildSlideHTML(slide, imageUrl) {
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
     + seamHTML
     + decorHTML
-    + '<div style="' + textCSS + textShadowCSS + '">' + contentHTML + '</div>'
+    + '<div style="' + textCSS + textShadowCSS + backdropCSS + '">' + contentHTML + '</div>'
     + '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />'
     + '</div></body></html>';
 }
