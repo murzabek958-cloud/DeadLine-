@@ -151,8 +151,8 @@ const COMPOSITION_RULES = `RULES:
 - composition.mood: "dark" "light" "warm" "cold" "vivid"
 - composition.elements: "eyebrow" "title" "subtitle" "divider" "body" "bullets" "stats" "quote_mark"
 - composition.decorative: "accent_line_left" "accent_line_right" "corner_circle" "bottom_rule" "grid_dots"
-- CRITICAL: "corner_accent" only occupies the bottom-right 38%x55% of the slide — it is a SMALL decorative image, not a background. NEVER use "corner_accent" on a slide that has 4+ bullets, a title, AND a subtitle together. Reserve "corner_accent" only for light content: title + subtitle + at most 2 short bullets, OR title + body only.
-- CRITICAL: if this slide has 2+ stats, do NOT use "right_half" or "left_half" — those give stats only ~48% width and cards will overflow. Use "full_background" or "none" instead.
+- VARIETY IS MANDATORY: use a MIX of image types across slides in this batch — do NOT default to "full_background" for every slide. Split layouts ("right_half", "left_half") work great for slides with a title + subtitle + a few bullets (no stats). "top_strip"/"bottom_strip" work well for slides with more text below/above the image band. Use "full_background" mainly for cover slides, closing slides, or slides where the image itself is the visual focus.
+- Sizing guide: "corner_accent" is a small decorative image (bottom-right ~38%x55%) — best for title + subtitle + 0-2 short bullets. If a slide has 2+ stat cards, prefer "full_background" or "none" for the image (stat cards need full width) — but do NOT let this push every other slide to full_background too.
 - imageQuery: English only, specific, photographic`;
 
 const CONTENT_RULES = `MANDATORY CONTENT RULES:
@@ -223,7 +223,13 @@ Each slideTopics entry is a short 3-6 word description of what that slide covers
 // batchTopics: [{ index, topic }] — осы батчта генерацияланатын слайдтар.
 // allTopics: толық тізім — модельге жалпы контекст беру үшін (тек атаулар,
 // толық мазмұн емес, сондықтан токен шығыны аз).
-async function generateSlideBatch(presentationTitle, allTopics, batchTopics, style, language) {
+// usedImageTypes: алдыңғы батчтарда қолданылған composition.image мәндерінің
+// тізімі. МАҢЫЗДЫ: batch-архитектурада әр батч бір-бірінен ЖЕКЕ, контекстсіз
+// шақырылады — сол себепті модель әр батчта "қауіпсіз" full_background-ты
+// қайта-қайта таңдап, бүкіл презентация бірыңғай болып шығатын (нақты
+// байқалған "бәрі фон+мәтін болып қалған" регресс). Бұл параметр әр
+// келесі батчқа "мыналар қолданылып қойды, басқасын қолдан" деп айтады.
+async function generateSlideBatch(presentationTitle, allTopics, batchTopics, style, language, usedImageTypes) {
   const languageRule = language
     ? `Write ALL text in ${language}. Title, subtitle, body, bullets — everything in ${language}.`
     : `Write content in the same language as the topic.`;
@@ -242,6 +248,18 @@ async function generateSlideBatch(presentationTitle, allTopics, batchTopics, sty
     ? `The LAST slide in this batch (slide ${allTopics.length}) is the CLOSING slide: summary with 3-5 conclusion bullets.`
     : '';
 
+  // Алдыңғы батчтарда full_background тым жиі қолданылса — келесі батчқа
+  // нақты, міндетті түрде split-layout қолдануды тапсырамыз.
+  const ALL_IMAGE_TYPES = ['full_background', 'right_half', 'left_half', 'top_strip', 'bottom_strip', 'corner_accent'];
+  let varietyRule = '';
+  if (usedImageTypes && usedImageTypes.length > 0) {
+    const fullBgRatio = usedImageTypes.filter(t => t === 'full_background').length / usedImageTypes.length;
+    const unusedTypes = ALL_IMAGE_TYPES.filter(t => !usedImageTypes.includes(t) && t !== 'full_background');
+    if (fullBgRatio >= 0.5) {
+      varietyRule = `IMPORTANT: previous slides used image types: [${usedImageTypes.join(', ')}] — too many were "full_background". For this batch, you MUST use one of these instead where it fits the content: ${unusedTypes.length > 0 ? unusedTypes.join(', ') : 'right_half, left_half, top_strip'}.`;
+    }
+  }
+
   const user = `You are writing slides for the presentation "${presentationTitle}".
 
 Full presentation outline (for context only — you are generating just the slides listed below):
@@ -252,6 +270,7 @@ ${batchList}
 
 ${coverRule}
 ${closingRule}
+${varietyRule}
 ${styleGuide(style)}
 ${languageRule}
 
@@ -302,10 +321,12 @@ async function generateSlides(topic, options = {}) {
   console.log(`[Pipeline] Generating ${slideTopics.length} slides in ${batches.length} batches of ~${SLIDES_PER_BATCH}...`);
 
   const allSlides = [];
+  const usedImageTypes = []; // барлық алдыңғы батчтарда қолданылған composition.image мәндері
   for (const batchTopics of batches) {
-    const slides = await generateSlideBatch(presentationTitle, slideTopics, batchTopics, style, language);
+    const slides = await generateSlideBatch(presentationTitle, slideTopics, batchTopics, style, language, usedImageTypes);
     allSlides.push(...slides);
-    console.log(`[Pipeline] Batch done: slides ${batchTopics.map(b => b.index).join(',')}`);
+    slides.forEach(s => { if (s.composition?.image) usedImageTypes.push(s.composition.image); });
+    console.log(`[Pipeline] Batch done: slides ${batchTopics.map(b => b.index).join(',')} — image types so far: [${usedImageTypes.join(', ')}]`);
   }
 
   // index бойынша сұрыптау (модель ретсіз қайтарса да дұрыс ретте болу үшін)
@@ -378,4 +399,4 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-        
+    
