@@ -5,7 +5,7 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const fs          = require('fs');
 const { generatePresentation }                                                      = require('./index');
-const { initDB, getUser, registerUser, addCredits, incrementRefCount, useCredit, setFreeUsed, resetFreeUsed } = require('./db');
+const { initDB, getUser, registerUser, addCredits, incrementRefCount, useCredit } = require('./db');
 
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
 
@@ -58,17 +58,13 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   }
 
   await registerUser(chatId, referredBy);
-  const user = await getUser(chatId);
 
   // Реферал санауы презентация жасатқанда өседі — тіркелуде емес
 
-  const hasFree = !user.freeUsed;
   bot.sendMessage(
     chatId,
     '👋 Сәлем! Мен кәсіби презентация жасайтын ботпын.\n\n' +
-    (hasFree
-      ? '🎁 Сізге *1 тегін презентация* бар!\n\nТақырыпты жазыңыз — бастаймыз.'
-      : `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\nТақырыпты жазыңыз немесе кредит сатып алыңыз.`),
+    `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\nТақырыпты жазыңыз немесе кредит сатып алыңыз.`,
     MAIN_KEYBOARD
   );
 });
@@ -78,17 +74,13 @@ bot.onText(/\/balance/, (msg) => showBalance(msg.chat.id));
 
 async function showBalance(chatId) {
   const user = await getUser(chatId);
-  const freeStatus = user.freeUsed
-    ? '❌ Тегін презентация пайдаланылды'
-    : '🎁 Тегін презентация қол жетімді';
 
   bot.sendMessage(
     chatId,
     `📊 *Менің есепшотым*\n\n` +
     `💳 Кредит: *${user.credits}* презентация\n` +
     `📦 Жалпы сатып алынды: *${user.total}*\n` +
-    `🔗 Реферал табысы: *${user.refEarnings}* кредит\n` +
-    `${freeStatus}`,
+    `🔗 Реферал табысы: *${user.refEarnings}* кредит`,
     { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
 }
@@ -128,11 +120,10 @@ function showHelp(chatId) {
   bot.sendMessage(
     chatId,
     '📖 *Қалай пайдалану:*\n\n' +
-    '1️⃣ Тақырыпты жазыңыз (тегін 1 рет)\n' +
-    '2️⃣ Кредит сатып алу үшін «💰 Кредит сатып алу» басыңыз\n' +
-    '3️⃣ Kaspi арқылы төлеңіз\n' +
-    '4️⃣ Чекті (PDF) осы ботқа жіберіңіз\n' +
-    '5️⃣ Кредит расталған соң тақырыпты жазыңыз\n\n' +
+    '1️⃣ «💰 Кредит сатып алу» басыңыз\n' +
+    '2️⃣ Kaspi арқылы төлеңіз\n' +
+    '3️⃣ Чекті (PDF) осы ботқа жіберіңіз\n' +
+    '4️⃣ Кредит расталған соң тақырыпты жазыңыз\n\n' +
     `📱 Kaspi: *${KASPI_PHONE}* (${KASPI_NAME})`,
     { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
@@ -231,8 +222,7 @@ bot.on('message', async (msg) => {
 
   const user = await getUser(chatId);
 
-  if (!user.freeUsed) return makePresentaton(chatId, text, true);
-  if (user.credits > 0) return makePresentaton(chatId, text, false);
+  if (user.credits > 0) return makePresentaton(chatId, text);
 
   waitingForCount.add(chatId);
   return bot.sendMessage(
@@ -243,36 +233,33 @@ bot.on('message', async (msg) => {
 });
 
 // ─── Презентация жасау ────────────────────────────────────────────────────
-async function makePresentaton(chatId, topic, isFree) {
+async function makePresentaton(chatId, topic) {
   if (processing.has(chatId)) {
     return bot.sendMessage(chatId, '⏳ Презентацияңыз жасалып жатыр, күтіңіз...');
   }
 
   processing.add(chatId);
 
-  if (isFree) {
-    await setFreeUsed(chatId);
-    // Реферал иесіне есептей — тегін презентация жасатқанда
-    const u = await getUser(chatId);
-    if (u.referredBy) {
-      const { newCount, bonusGiven } = await incrementRefCount(u.referredBy);
-      const remaining = 3 - (newCount % 3);
-      if (bonusGiven) {
-        bot.sendMessage(
-          u.referredBy,
-          `🎉 *+1 кредит!* Сенің реферал сілтемең арқылы ${newCount} адам презентация жасатты!\n\nКелесі кредит үшін тағы *3 адам* қажет.`,
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      } else {
-        bot.sendMessage(
-          u.referredBy,
-          `👥 Сенің реферал сілтемең арқылы жаңа адам презентация жасатты!\n\nКредит алу үшін тағы *${remaining} адам* керек.`,
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      }
+  await useCredit(chatId);
+
+  // Реферал иесіне есептей — кез келген (ақылы) презентация жасатқанда
+  const u = await getUser(chatId);
+  if (u.referredBy) {
+    const { newCount, bonusGiven } = await incrementRefCount(u.referredBy);
+    const remaining = 3 - (newCount % 3);
+    if (bonusGiven) {
+      bot.sendMessage(
+        u.referredBy,
+        `🎉 *+1 кредит!* Сенің реферал сілтемең арқылы ${newCount} адам презентация жасатты!\n\nКелесі кредит үшін тағы *3 адам* қажет.`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    } else {
+      bot.sendMessage(
+        u.referredBy,
+        `👥 Сенің реферал сілтемең арқылы жаңа адам презентация жасатты!\n\nКредит алу үшін тағы *${remaining} адам* керек.`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
     }
-  } else {
-    await useCredit(chatId);
   }
 
   const userAfter   = await getUser(chatId);
@@ -283,7 +270,7 @@ async function makePresentaton(chatId, topic, isFree) {
     statusMsg = await bot.sendMessage(
       chatId,
       `⏳ Презентация жасалуда...\n\n📌 Тақырып: *${escapeMarkdown(topic)}*\n` +
-      (isFree ? '🎁 Тегін презентация\n' : `💳 Қалған кредит: ${remaining}\n`) +
+      `💳 Қалған кредит: ${remaining}\n` +
       `\n_1-2 минут күтіңіз..._`,
       { parse_mode: 'Markdown' }
     );
@@ -300,9 +287,7 @@ async function makePresentaton(chatId, topic, isFree) {
       {
         caption:
           `📊 *${escapeMarkdown(title)}*\n\n` +
-          (isFree
-            ? `🎁 Тегін презентацияңыз дайын!\n\n💳 Келесі үшін «💰 Кредит сатып алу» басыңыз.`
-            : `💳 Қалған презентация: *${remaining}*`),
+          `💳 Қалған презентация: *${remaining}*`,
         parse_mode: 'Markdown',
       }
     );
@@ -312,15 +297,9 @@ async function makePresentaton(chatId, topic, isFree) {
   } catch (err) {
     console.error('[Bot] Error:', err.message);
 
-    if (isFree) {
-      await resetFreeUsed(chatId);
-    } else {
-      await addCredits(chatId, 1);
-    }
+    await addCredits(chatId, 1);
 
-    const errText = isFree
-      ? '❌ Қате орын алды.\n\nТегін презентацияңыз қайтарылды, қайта жіберіп көріңіз.'
-      : '❌ Қате орын алды, кредитіңіз қайтарылды.\n\nТақырыпты қайта жіберіп көріңіз.';
+    const errText = '❌ Қате орын алды, кредитіңіз қайтарылды.\n\nТақырыпты қайта жіберіп көріңіз.';
 
     if (statusMsg) {
       await bot.editMessageText(errText, {
@@ -345,4 +324,5 @@ initDB()
     console.error('[DB] Init error:', err);
     process.exit(1);
   });
+
     
