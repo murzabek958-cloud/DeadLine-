@@ -334,12 +334,20 @@ function overlayForTextPosition(textPos) {
   return 'dark_full'; // center/center_left/center_right — мәтін ортада, толық overlay ең сенімдісі
 }
 
+// Overlay мәндерінің біразы (мысалы color_wash — небары ~13% қараңғылық,
+// немесе light_full қараңғы mood-та) мәтінге ЖЕТКІЛІКСІЗ контраст береді.
+// Модель "overlay бар" деп жауап бергенімен, ол іс жүзінде дерлік
+// мөлдір болуы мүмкін — сол себепті нақты байқалған "тек cover дұрыс,
+// қалғаны жалаң" багы шықты: тек overlayType==='none' тексерілгендіктен,
+// "color_wash" секілді бар-бірақ-әлсіз мәндер өзгертілместен өтіп кеткен.
+const WEAK_OVERLAYS = ['none', 'color_wash'];
+
 function sanitizeComposition(imageType, overlayType, img, textPos) {
   let safeOverlay = overlayType;
 
-  // full_background-та overlay мүлде жоқ болса — textPos-қа сай бағыт таңдаймыз,
-  // "әрдайым bottom" деген қатаң ереже орнына.
-  if (imageType === 'full_background' && overlayType === 'none' && img) {
+  // full_background-та overlay жоқ НЕМЕСЕ жеткіліксіз әлсіз болса —
+  // textPos-қа сай қауіпсіз бағыт таңдаймыз.
+  if (imageType === 'full_background' && WEAK_OVERLAYS.indexOf(overlayType) !== -1 && img) {
     safeOverlay = overlayForTextPosition(textPos);
   }
 
@@ -468,7 +476,21 @@ function buildSlideHTML(slide, imageUrl) {
   const hasSubtitle   = !!slide.subtitle;
   const hasBody       = !!slide.body;
   const isContentHeavy = bulletCount >= 3 || (hasSubtitle && hasBody) || (hasSubtitle && bulletCount >= 2);
-  const imageType = (rawImageType === 'corner_accent' && isContentHeavy) ? 'full_background' : rawImageType;
+  let imageType = (rawImageType === 'corner_accent' && isContentHeavy) ? 'full_background' : rawImageType;
+
+  // Kepildik #2: right_half/left_half сурет контейнердің ені небары 48%
+  // (~486px пайдалы кеңістік, padding алынған соң). 2+ stat карточка
+  // (әрқайсысы кемінде ~150-180px, gap 24px) сол енге СЫЙМАЙДЫ — карточка
+  // не сығылып мәтіні кесіледі, не контейнерден шығып суреттің үстіне
+  // мінеді (нақты байқалған баг: "Экспериментті дәлелдер" слайды).
+  // Сондықтан 2+ stat бар слайдта split-layout (right_half/left_half)
+  // автоматты full_background-қа ауысады — толық ен статтарға жеткілікті
+  // орын береді.
+  const statCount = (slide.stats && slide.stats.length) || 0;
+  const isSplitLayout = imageType === 'right_half' || imageType === 'left_half';
+  if (isSplitLayout && statCount >= 2) {
+    imageType = 'full_background';
+  }
 
   // Stat cards бар слайдта сурет болса — толық қараңғы overlay,
   // әйтпесе карточка мен сурет бір-бірімен араласып, оқылмай қалады.
@@ -483,15 +505,14 @@ function buildSlideHTML(slide, imageUrl) {
   const hasOverlay = img && safeOverlay !== 'none';
   const textCSS    = textPositionCSS(textPos, imageType);
 
-  // Кепілдендірілген контраст: сурет мәтін аймағының ТУРА астында жатса
-  // (full_background/top_strip/bottom_strip/corner_accent — яғни фонды
-  // толығымен немесе ішінара алатын layout-тар), тек overlay-ге сену
-  // жеткіліксіз — суреттің нақты жарықтығы алдын ала белгісіз (ашық аспан,
-  // сұр қабырға, т.б. болуы мүмкін). Сондықтан мәтінге әрдайым жұмсақ
-  // text-shadow қосамыз — қараңғы да, ашық та фонда әріп контурын ұстап
-  // тұрады, палитра/сурет реңкіне тәуелсіз жұмыс істейді.
-  const BACKGROUND_HEAVY = ['full_background', 'top_strip', 'bottom_strip', 'corner_accent'];
-  const needsTextShadow = img && BACKGROUND_HEAVY.indexOf(imageType) !== -1;
+  // Кепілдендірілген контраст: сурет БАР жерде мәтін тұрса — тек overlay-ге
+  // сену жеткіліксіз (суреттің нақты жарықтығы алдын ала белгісіз, әрі
+  // модель кейде "бар-бірақ-әлсіз" overlay қайтарады). Бұрын тек 4 layout
+  // түріне (full_background/top_strip/bottom_strip/corner_accent) шектелген
+  // еді, бірақ right_half/left_half секілді split-layout-тарда да мәтін
+  // сурет жиегіне жақын тұрғанда контраст жетіспейтіні байқалды —
+  // сондықтан енді СУРЕТІ БАР кез келген композицияда text-shadow қосылады.
+  const needsTextShadow = !!img;
   const textShadowCSS = needsTextShadow
     ? (palette.text === '#1a1a1a'
         // light-mood мәтін қара болғанда — ашық сурет үстінде ақ "гало" контур
