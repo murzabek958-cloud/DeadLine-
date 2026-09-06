@@ -8,7 +8,7 @@
 // (≈4₸) түседі, өзіндік rate limit те әлдеқайда жоғары (RPM/TPM шегі
 // ресми жарияланбаған, бірақ Groq-тың тегін 6000 TPM-нен әлдеқайда кең).
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_MODEL   = 'DeepSeek V4-Flash';
+const DEEPSEEK_MODEL   = 'deepseek-v4-flash';
 
 // Ескерту: batch-архитектура (SLIDES_PER_BATCH, MAX_TOKENS_PER_CALL) Groq-тың
 // тар 6000 TPM лимитін айналып өту үшін жасалған еді. DeepSeek-те бұл шектеу
