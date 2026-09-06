@@ -60,9 +60,22 @@ async function groqChat(systemPrompt, userPrompt, label) {
 
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content || '';
+  const finishReason = data.choices?.[0]?.finish_reason;
 
   if (data.usage) {
     console.log(`[Tokens] ${label} — input: ${data.usage.prompt_tokens}, output: ${data.usage.completion_tokens}, total: ${data.usage.total_tokens}`);
+  }
+
+  if (finishReason === 'length') {
+    // JSON max_tokens шегінде ортасынан кесілген — parseJSON-ға дейін жетсе,
+    // регекспен "жөндеп" көреді, бірақ құрылымы бұзылған JSON болғандықтан
+    // бәрібір парсинг қатесі шығады. withRetry мұны 429/503 сияқты
+    // retry-ланатын қате деп танымайтын, сондықтан осында арнайы белгі
+    // қойып лақтырамыз — withRetry соны ұстап, қайта сұрайды (temperature=1.0
+    // болғандықтан келесі әрекетте қысқарақ шығуы мүмкін).
+    const err = new Error(`[length] ${label} — output max_tokens (${MAX_TOKENS_PER_CALL}) шегінде кесілді (finish_reason=length)`);
+    err.isTruncated = true;
+    throw err;
   }
 
   return text;
@@ -79,16 +92,25 @@ async function withRetry(fn, label) {
       const msg = err.message || '';
       const is503 = msg.includes('503') || msg.includes('fetch failed');
       const is429 = msg.includes('429') || msg.includes('quota') || msg.includes('rate_limit') || msg.includes('Rate limit');
+      const isTruncated = err.isTruncated === true;
 
-      if (!is503 && !is429) throw err;
+      if (!is503 && !is429 && !isTruncated) throw err;
+
+      // 3 реттен көп кесілсе, циклді тоқтатып, жоғарыға нақты қате беру —
+      // шексіз retry-мен пайдаланушыны күттірмеу үшін.
+      if (isTruncated && attempt >= 3) {
+        throw new Error(`${msg} — ${attempt} әрекеттен кейін де кесіліп тұр, max_tokens жеткіліксіз болуы мүмкін`);
+      }
 
       let delay = Math.min(5000 * attempt, 30000);
       if (is429) {
         const match = msg.match(/try again in (\d+\.?\d*)s/i) || msg.match(/retry[^0-9]*(\d+)[^0-9]*s/i);
         delay = match ? (parseFloat(match[1]) + 2) * 1000 : 30000;
+      } else if (isTruncated) {
+        delay = 2000; // rate-limit емес, tez qaita surau jetkilikti
       }
 
-      const reason = is429 ? '429 Rate limit' : '503';
+      const reason = is429 ? '429 Rate limit' : isTruncated ? 'length (кесілді)' : '503';
       console.warn(`[DeepSeek] ${label} — attempt ${attempt} failed (${reason}). Retry in ${delay / 1000}s...`);
       await new Promise(r => setTimeout(r, delay));
     }
@@ -101,8 +123,16 @@ function parseJSON(text) {
     return JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('Invalid JSON from Groq');
-    return JSON.parse(match[0]);
+    if (!match) {
+      const preview = text.slice(-200);
+      throw new Error(`Invalid JSON from DeepSeek — жауап толық емес немесе бос (соңы: "...${preview}")`);
+    }
+    try {
+      return JSON.parse(match[0]);
+    } catch (e) {
+      const preview = text.slice(-200);
+      throw new Error(`Invalid JSON from DeepSeek — JSON құрылымы бұзылған, ықтимал max_tokens шегінде кесілген (соңы: "...${preview}")`);
+    }
   }
 }
 
@@ -403,4 +433,3 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-                                                                                                                                       
