@@ -25,37 +25,39 @@ async function initDB() {
   // Ескі кестеге баганалар қос (егер жоқ болса)
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT NULL`);
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ref_earnings INTEGER NOT NULL DEFAULT 0`);
+  // ЕСКЕРТУ: free_used бағанасы кестеде әлі тұр (ескі жолдармен үйлесімділік
+  // үшін DROP етпедік), бірақ тегін презентация логикасы алынғандықтан
+  // код енді оны оқымайды/жазбайды.
   console.log('[DB] Table ready');
 }
 
 async function getUser(chatId) {
   try {
     const res = await pool.query(
-      'SELECT credits, total, free_used, referred_by, ref_earnings FROM users WHERE chat_id = $1',
+      'SELECT credits, total, referred_by, ref_earnings FROM users WHERE chat_id = $1',
       [String(chatId)]
     );
     if (!res.rows.length) {
-      return { credits: 0, total: 0, freeUsed: false, referredBy: null, refEarnings: 0 };
+      return { credits: 0, total: 0, referredBy: null, refEarnings: 0 };
     }
     const r = res.rows[0];
     return {
       credits: r.credits,
       total: r.total,
-      freeUsed: r.free_used,
       referredBy: r.referred_by,
       refEarnings: r.ref_earnings,
     };
   } catch (err) {
     console.error('[DB] getUser error:', err.message);
-    return { credits: 0, total: 0, freeUsed: true, referredBy: null, refEarnings: 0 };
+    return { credits: 0, total: 0, referredBy: null, refEarnings: 0 };
   }
 }
 
 async function registerUser(chatId, referredBy = null) {
   try {
     await pool.query(`
-      INSERT INTO users (chat_id, credits, total, free_used, referred_by, ref_earnings)
-      VALUES ($1, 0, 0, FALSE, $2, 0)
+      INSERT INTO users (chat_id, credits, total, referred_by, ref_earnings)
+      VALUES ($1, 0, 0, $2, 0)
       ON CONFLICT (chat_id) DO NOTHING
     `, [String(chatId), referredBy ? String(referredBy) : null]);
   } catch (err) {
@@ -66,8 +68,8 @@ async function registerUser(chatId, referredBy = null) {
 async function addCredits(chatId, amount) {
   try {
     await pool.query(`
-      INSERT INTO users (chat_id, credits, total, free_used, ref_earnings)
-      VALUES ($1, $2, $2, FALSE, 0)
+      INSERT INTO users (chat_id, credits, total, ref_earnings)
+      VALUES ($1, $2, $2, 0)
       ON CONFLICT (chat_id) DO UPDATE
       SET credits = users.credits + $2,
           total   = users.total   + $2
@@ -127,31 +129,5 @@ async function useCredit(chatId) {
   }
 }
 
-async function setFreeUsed(chatId) {
-  try {
-    await pool.query(`
-      INSERT INTO users (chat_id, credits, total, free_used, ref_earnings)
-      VALUES ($1, 0, 0, TRUE, 0)
-      ON CONFLICT (chat_id) DO UPDATE
-      SET free_used = TRUE
-    `, [String(chatId)]);
-    console.log(`[DB] setFreeUsed: ${chatId}`);
-  } catch (err) {
-    console.error('[DB] setFreeUsed error:', err.message);
-    throw err;
-  }
-}
-
-async function resetFreeUsed(chatId) {
-  try {
-    await pool.query(
-      'UPDATE users SET free_used = FALSE WHERE chat_id = $1',
-      [String(chatId)]
-    );
-    console.log(`[DB] resetFreeUsed: ${chatId}`);
-  } catch (err) {
-    console.error('[DB] resetFreeUsed error:', err.message);
-  }
-}
-
-module.exports = { initDB, getUser, registerUser, addCredits, incrementRefCount, useCredit, setFreeUsed, resetFreeUsed };
+module.exports = { initDB, getUser, registerUser, addCredits, incrementRefCount, useCredit };
+        
