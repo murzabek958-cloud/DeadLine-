@@ -555,7 +555,7 @@ function buildSlideHTML(slide, imageUrl) {
     + (hasOverlay ? '<div style="position:absolute;inset:0;z-index:1;' + overlayCSS(safeOverlay, accent) + '"></div>' : '')
     + seamHTML
     + decorHTML
-    + '<div style="' + textCSS + ';' + textShadowCSS + '">' + contentHTML + '</div>'
+    + '<div style="' + textCSS + textShadowCSS + '">' + contentHTML + '</div>'
     + '<img src="' + LOGO_WHITE + '" style="position:absolute;bottom:24px;right:32px;height:36px;opacity:0.85;z-index:10;object-fit:contain;" />'
     + '</div></body></html>';
 }
