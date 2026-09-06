@@ -8,15 +8,27 @@
 // (≈4₸) түседі, өзіндік rate limit те әлдеқайда жоғары (RPM/TPM шегі
 // ресми жарияланбаған, бірақ Groq-тың тегін 6000 TPM-нен әлдеқайда кең).
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_MODEL   = 'deepseek-v4-pro';
+const DEEPSEEK_MODEL   = 'DeepSeek V4-Flash';
 
 // Ескерту: batch-архитектура (SLIDES_PER_BATCH, MAX_TOKENS_PER_CALL) Groq-тың
 // тар 6000 TPM лимитін айналып өту үшін жасалған еді. DeepSeek-те бұл шектеу
 // жоқ дерлік, бірақ архитектураны сол қалпында қалдырамыз — себебі ол JSON
 // сапасын да жақсартады (әр батч азырақ слайдты толық, кесілместен сипаттайды)
 // және retry/error-recovery логикасы үшін де пайдалы гранулярлық береді.
-const MAX_TOKENS_PER_CALL = 4000; // DeepSeek-те орын кеңірек, сәл көбейттік
-const SLIDES_PER_BATCH    = 3;    // TPM тарылтуы жоқ болғандықтан 2-ден 3-ке қайтардық
+//
+// МАҢЫЗДЫ ТҮЗЕТУ: алдында MAX_TOKENS_PER_CALL=4000 қойылған, бірақ бұл
+// SLIDES_PER_BATCH=3-пен ЖЕТКІЛІКСІЗ болып шықты — нақты логта generateBatch
+// output-ы дәл 4000 токенде тоқтап, JSON кесіліп қалған ("Invalid JSON",
+// "Expected ',' or ']'" қателері осыдан). DeepSeek-тің TPM шегі болмаса да,
+// max_tokens әрдайым қатаң output шегі күйінде қалады — оны батч мазмұнына
+// сай жеткілікті үлкен қою керек. 1 слайдтың толық composition-мен JSON-ы
+// шамамен ~1500-2000 токен алады (title+subtitle+body+bullets+stats+8
+// composition өрісі), 3 слайд ≈ 4500-6000 токен — сондықтан 4000 тым тар
+// болды. DeepSeek-тің 1M контекст терезесі мен TPM шегінің жоқтығын
+// пайдаланып, 9000-ға көбейттік — 3 слайдқа кемінде 50% қосымша орын
+// қалдырады.
+const MAX_TOKENS_PER_CALL = 9000;
+const SLIDES_PER_BATCH    = 3;
 
 async function groqChat(systemPrompt, userPrompt, label) {
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -391,3 +403,4 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
+                                                                                                                                       
