@@ -16,18 +16,18 @@ const DEEPSEEK_MODEL   = 'deepseek-v4-flash';
 // сапасын да жақсартады (әр батч азырақ слайдты толық, кесілместен сипаттайды)
 // және retry/error-recovery логикасы үшін де пайдалы гранулярлық береді.
 //
-// МАҢЫЗДЫ ТҮЗЕТУ: алдында MAX_TOKENS_PER_CALL=4000 қойылған, бірақ бұл
-// SLIDES_PER_BATCH=3-пен ЖЕТКІЛІКСІЗ болып шықты — нақты логта generateBatch
-// output-ы дәл 4000 токенде тоқтап, JSON кесіліп қалған ("Invalid JSON",
-// "Expected ',' or ']'" қателері осыдан). DeepSeek-тің TPM шегі болмаса да,
-// max_tokens әрдайым қатаң output шегі күйінде қалады — оны батч мазмұнына
-// сай жеткілікті үлкен қою керек. 1 слайдтың толық composition-мен JSON-ы
-// шамамен ~1500-2000 токен алады (title+subtitle+body+bullets+stats+8
-// composition өрісі), 3 слайд ≈ 4500-6000 токен — сондықтан 4000 тым тар
-// болды. DeepSeek-тің 1M контекст терезесі мен TPM шегінің жоқтығын
-// пайдаланып, 9000-ға көбейттік — 3 слайдқа кемінде 50% қосымша орын
-// қалдырады.
-const MAX_TOKENS_PER_CALL = 9000;
+// МАҢЫЗДЫ ТҮЗЕТУ (2-ретті): 9000 да жеткіліксіз болды — логта generateBatch
+// output-ы тұрақты түрде дәл 9000-де тоқтап, finish_reason=length шығып,
+// JSON ортасынан кесіліп жатты (retry-мен де қайталанып қойды — демек бұл
+// кездейсоқтық емес, JSON-ның нақты өзі 9000 токеннен асып түседі).
+// DeepSeek V4 Flash-тың ресми максимум output шегі 393216 токен (документте
+// расталған), ал API ақылы болғандықтан, шығынды үнемдеу мақсатымен жасанды
+// төмен санды ұстау қажеті жоқ — JSON қаншалықты керек болса, сонша жазып,
+// табиғи түрде (finish_reason="stop") тоқтауы үшін лимитті моделдің нақты
+// максимумына қойдық. Бұл "шексіздікке" тең — API-нің өзінде max_tokens
+// параметрі міндетті болғандықтан толық алып тастау мүмкін емес, бірақ
+// осы мән тәжірибеде шектеу жоқтай әсер етеді.
+const MAX_TOKENS_PER_CALL = 393216;
 const SLIDES_PER_BATCH    = 3;
 
 async function groqChat(systemPrompt, userPrompt, label) {
@@ -39,6 +39,12 @@ async function groqChat(systemPrompt, userPrompt, label) {
     },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
+      // DeepSeek V4 сериясында thinking (reasoning) режимі ӘДЕПКІ БОЙЫНША
+      // ҚОСУЛЫ тұрады — reasoning_content те max_tokens шегінің ішінде
+      // есептеліп, output token ретінде ақыланады. Бізге тек тікелей JSON
+      // керек (реасонинг презентация JSON-ы үшін пайдасыз), сондықтан
+      // өшіріп қоямыз — max_tokens толығымен нақты JSON-ға жұмсалады.
+      thinking: { type: 'disabled' },
       // DeepSeek өз құжатында temperature/top_p үшін 1.0 ұсынады (GPT/Claude
       // әдепкісінен өзгеше) — creative/generation тапсырмаларында дәйектірек
       // нәтиже береді. 0.7 Groq/OpenAI дәстүрінен қалған мән еді.
@@ -433,3 +439,4 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
+  
