@@ -1,45 +1,37 @@
 'use strict';
 
-// ─── Groq клиенті (fetch арқылы, SDK орнатпай) ───────────────────────────
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL   = 'openai/gpt-oss-120b';
+// ─── DeepSeek клиенті (fetch арқылы, SDK орнатпай) ───────────────────────
+// Groq-тан DeepSeek V4-Pro-ға көшірілді — Groq-тың тегін деңгейінің 6000
+// TPM шегі рейт-лимит қателерін тудырып тұрғандықтан, ал Developer (ақылы)
+// деңгей "high demand" себебінен уақытша жабық болды. DeepSeek V4-Pro:
+// ~$0.435/млн input, ~$0.87/млн output — 1 презентация шамамен $0.008-ге
+// (≈4₸) түседі, өзіндік rate limit те әлдеқайда жоғары (RPM/TPM шегі
+// ресми жарияланбаған, бірақ Groq-тың тегін 6000 TPM-нен әлдеқайда кең).
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_MODEL   = 'deepseek-v4-pro';
 
-// МАҢЫЗДЫ: Groq тегін деңгейінде БАРЛЫҚ модель үшін минутына тек 6,000
-// токен (TPM) лимиті бар (ITPM+OTPM қосындысы). Бір ғана шақыруда 8-10
-// слайдты толық composition-мен (title+subtitle+body+bullets+stats+8
-// composition өрісі) сұрасақ, шығыс сол шектен асып, модель JSON-ды
-// "қысқартып", соңғы слайдтарды бос/бұзық қалдырады — дәл байқалған
-// "барған сайын нашарлайды" багы.
-//
-// Шешім: презентацияны БІР үлкен шақыру орнына бірнеше КІШІ шақыруға
-// бөлеміз (әр слайд батчы өз алдынша ~6000 токен бюджетімен). Бұл жалпы
-// генерация уақытын ұзартады (20-40 секундтан ~1-2 минутқа), бірақ әр
-// слайд толық сапамен, қысқартусыз шығады — сапа санынан маңыздырақ.
-// МАҢЫЗДЫ: 6000 TPM лимиті INPUT+OUTPUT қосындысына қолданылады, тек
-// output-қа емес. Алдында max_tokens:6000 қойылған — бұл output шегі
-// ғана, ал input (system+user prompt, әсіресе review-де толық слайд
-// JSON-ы ~2000-3000 токен) осыған үстеледі. Нәтижесінде бір шақырудың
-// өзі 8000-9000 токенге жетіп, TPM лимитін бірден асырып, 429 қатесін
-// қайта-қайта тудыратын — дәл байқалған "рейт лимит қайталанып тұр" багы.
-// 3500 — типтік input (~2000-2500 токен, 3 слайдты сипаттауға) үшін
-// жеткілікті орын қалдыратын, әрі output-тың өзі де толық composition-мен
-// 3 слайдты сипаттауға жететін мән.
-const MAX_TOKENS_PER_CALL = 3500;
-// 3-тен 2-ге азайтылды: 3500 output + ~1500-2000 input 3 слайдпен
-// 6000 TPM шегіне тым жақын тұрады (риск әлі бар). 2 слайд — input та,
-// output та азырақ, TPM шегінен қауіпсіз қашықтықта тұрады.
-const SLIDES_PER_BATCH    = 2;
+// Ескерту: batch-архитектура (SLIDES_PER_BATCH, MAX_TOKENS_PER_CALL) Groq-тың
+// тар 6000 TPM лимитін айналып өту үшін жасалған еді. DeepSeek-те бұл шектеу
+// жоқ дерлік, бірақ архитектураны сол қалпында қалдырамыз — себебі ол JSON
+// сапасын да жақсартады (әр батч азырақ слайдты толық, кесілместен сипаттайды)
+// және retry/error-recovery логикасы үшін де пайдалы гранулярлық береді.
+const MAX_TOKENS_PER_CALL = 4000; // DeepSeek-те орын кеңірек, сәл көбейттік
+const SLIDES_PER_BATCH    = 3;    // TPM тарылтуы жоқ болғандықтан 2-ден 3-ке қайтардық
 
 async function groqChat(systemPrompt, userPrompt, label) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.7,
+      model: DEEPSEEK_MODEL,
+      // DeepSeek өз құжатында temperature/top_p үшін 1.0 ұсынады (GPT/Claude
+      // әдепкісінен өзгеше) — creative/generation тапсырмаларында дәйектірек
+      // нәтиже береді. 0.7 Groq/OpenAI дәстүрінен қалған мән еді.
+      temperature: 1.0,
+      top_p: 1.0,
       max_tokens: MAX_TOKENS_PER_CALL,
       response_format: { type: 'json_object' },
       messages: [
@@ -85,7 +77,7 @@ async function withRetry(fn, label) {
       }
 
       const reason = is429 ? '429 Rate limit' : '503';
-      console.warn(`[Groq] ${label} — attempt ${attempt} failed (${reason}). Retry in ${delay / 1000}s...`);
+      console.warn(`[DeepSeek] ${label} — attempt ${attempt} failed (${reason}). Retry in ${delay / 1000}s...`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
@@ -399,4 +391,3 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-    
