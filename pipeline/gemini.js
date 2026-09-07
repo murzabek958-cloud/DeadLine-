@@ -143,30 +143,56 @@ function parseJSON(text) {
 }
 
 // ─── Параметрлерді парсинг ────────────────────────────────────────────────
+// МАҢЫЗДЫ ТҮЗЕТУ: бұрын `input.split(',')[0]` арқылы бірінші үтірге дейінгі
+// бөлікті ғана `topic` деп алатын. Бұл қысқа команда үшін дұрыс еді
+// ("тақырып, 10 слайд, қазақша"), бірақ пайдаланушы силлабус/дәріс мәтінін
+// толығымен жіберсе (мұнда үтір өте көп кездеседі — тізімдер, сөйлемдер),
+// нәтижесінде мәтіннің 90%+ бөлігі "topic"-тен мүлдем тыс қалып, тек
+// бірінші сөйлемнің бір бөлігі ғана DeepSeek-ке жететін ("жалпылама тақырып"
+// бага дәл осыдан еді).
+//
+// Жаңа тәсіл: параметрлерді ЕҢ СОҢЫНАН бастап іздейміз — тек соңғы
+// бөліктер нақты параметр үлгісіне (сан+"слайд", тіл атауы, стиль атауы)
+// сай келсе ғана оларды бөліп аламыз. Сай келмеген сәтте бірден тоқтаймыз
+// (одан арғы, алдыңғы бөліктер силлабустың табиғи мәтіні болуы мүмкін,
+// оларды параметр деп қате тани алмаймыз). Қалған барлық мәтін (соңынан
+// алынған параметрлерсіз) толығымен topic болып сақталады — үтір саны
+// қанша болса да.
 function parseUserInput(input) {
-  const parts = input.split(',').map(s => s.trim());
-  const topic = parts[0];
+  const parts = input.split(',').map(s => s.trim()).filter(Boolean);
 
   let slideCount = null;
   let language   = null;
   let style      = null;
 
-  for (const part of parts.slice(1)) {
-    const lower = part.toLowerCase();
+  let cut = parts.length; // topic-qa kiretin bolikterdin sany (sonynan kesiledi)
 
-    const numMatch = lower.match(/(\d+)\s*(слайд|slide|бет|страниц)/);
-    if (numMatch) { slideCount = Math.min(Math.max(parseInt(numMatch[1]), 5), 15); continue; }
+  for (let i = parts.length - 1; i >= 1; i--) { // parts[0]-di hesh kashan parametr etip almaimyz
+    const lower = parts[i].toLowerCase();
+    let matched = false;
 
-    if (lower.includes('қаз') || lower.includes('каз') || lower.includes('kazakh')) { language = 'Kazakh'; continue; }
-    if (lower.includes('орыс') || lower.includes('рус') || lower.includes('russian')) { language = 'Russian'; continue; }
-    if (lower.includes('ағыл') || lower.includes('англ') || lower.includes('english')) { language = 'English'; continue; }
+    if (!slideCount) {
+      const numMatch = lower.match(/^(\d+)\s*(слайд|slide|бет|страниц)/);
+      if (numMatch) { slideCount = Math.min(Math.max(parseInt(numMatch[1]), 5), 15); matched = true; }
+    }
+    if (!matched && !language) {
+      if (/^(қаз|каз|kazakh)/.test(lower)) { language = 'Kazakh'; matched = true; }
+      else if (/^(орыс|рус|russian)/.test(lower)) { language = 'Russian'; matched = true; }
+      else if (/^(ағыл|англ|english)/.test(lower)) { language = 'English'; matched = true; }
+    }
+    if (!matched && !style) {
+      if (/^(бизнес|корпор|business)/.test(lower)) { style = 'business'; matched = true; }
+      else if (/^(минимал|minimal)/.test(lower)) { style = 'minimal'; matched = true; }
+      else if (/^(креатив|creative)/.test(lower)) { style = 'creative'; matched = true; }
+      else if (/^(академ|ғылым|научн)/.test(lower)) { style = 'academic'; matched = true; }
+      else if (/^(питч|pitch)/.test(lower)) { style = 'pitch'; matched = true; }
+    }
 
-    if (lower.includes('бизнес') || lower.includes('корпор') || lower.includes('business')) { style = 'business'; continue; }
-    if (lower.includes('минимал') || lower.includes('minimal')) { style = 'minimal'; continue; }
-    if (lower.includes('креатив') || lower.includes('creative')) { style = 'creative'; continue; }
-    if (lower.includes('академ') || lower.includes('ғылым') || lower.includes('научн')) { style = 'academic'; continue; }
-    if (lower.includes('питч') || lower.includes('pitch')) { style = 'pitch'; continue; }
+    if (!matched) break; // sonyndagy bolik parametr emes — odan ari izdemeimiz
+    cut = i;
   }
+
+  const topic = parts.slice(0, cut).join(', ');
 
   return { topic, slideCount, language, style };
 }
@@ -232,14 +258,32 @@ const SLIDE_JSON_SHAPE = `{
 async function generateOutline(topic, slideCount, language) {
   const languageRule = language
     ? `Write in ${language}.`
-    : `Write in the same language as the topic.`;
+    : `Write in the same language as the topic/material.`;
 
   const system = `You are a presentation structure planner. You ALWAYS respond with valid JSON only. No markdown, no explanation.`;
 
-  const user = `Plan the structure for a presentation on: "${topic}".
+  // МАҢЫЗДЫ: пайдаланушы кейде тек қысқа тақырып емес, толық материал
+  // (силлабус, курс жоспары, дәріс мәтіні) жібереді. Бұрын промпт мұны
+  // әрдайым "қысқа тақырып" деп қарастырып, тек соның негізінде жалпы
+  // slideTopics ойдан құратын (силлабустың нақты апта/тарау бөлінісі,
+  // тапсырмалар мен детальдер жоғалып, орнына жалпылама атаулар келетін —
+  // нақты байқалған баг). Енді материалдың КӨЛЕМІНЕ қарай екі режимді
+  // нақты ажыратамыз: егер ол құрылымды болса (нөмірленген апта/тарау/
+  // бөлім тізімі бар), сол құрылымды дәлме-дәл сақтап, slideTopics-ті
+  // содан алу керек — жаңа тақырып ойлап табу емес.
+  const user = `Here is the source material for a presentation:
+"""
+${topic}
+"""
 
-Generate exactly ${slideCount} slides. ${languageRule}
+STEP 1 — Determine the material type:
+- SHORT TOPIC (a few words/sentences, no internal structure) → you must invent a logical structure for it.
+- STRUCTURED MATERIAL (syllabus, course outline, lecture notes, numbered weeks/chapters/sections, or any text with its own internal breakdown) → you must PRESERVE that existing structure. Do NOT collapse it into a generic summary. Do NOT invent your own structure when the material already has one.
+
+STEP 2 — Generate exactly ${slideCount} slides. ${languageRule}
 Slide 1 must be a cover/intro slide. The last slide must be a closing/summary slide.
+- If STRUCTURED MATERIAL: map the existing weeks/chapters/sections onto the middle slides in their original order. If there are more sections than available slides, group adjacent sections together rather than dropping content. Keep original section names/numbers (e.g. "Апта 3: ...", "Тарау 2: ...") where present.
+- If SHORT TOPIC: design a sensible flow (intro → concepts → details → applications → conclusion, or similar).
 
 Return ONLY this JSON:
 {
@@ -247,7 +291,9 @@ Return ONLY this JSON:
   "slideTopics": ["Slide 1 short topic", "Slide 2 short topic", ...]
 }
 
-Each slideTopics entry is a short 3-6 word description of what that slide covers — just enough to guide detailed content generation later. Ensure logical flow from slide to slide (intro → concepts → details → applications → conclusion, or similar).`;
+Each slideTopics entry must be specific enough to guide detailed content generation later:
+- For STRUCTURED MATERIAL, include the actual section identity AND its key points, e.g. "Апта 3: Нейрондық желілер — перцептрон, активация функциялары, backpropagation" (not just "Нейрондық желілер").
+- For SHORT TOPIC, a short 3-6 word description is enough.`;
 
   const text = await withRetry(() => groqChat(system, user, 'generateOutline'), 'generateOutline');
   const parsed = parseJSON(text);
@@ -307,6 +353,8 @@ ${contextList}
 
 Generate DETAILED, FULLY-FORMED content for ONLY these slides:
 ${batchList}
+
+IMPORTANT: if a slide's topic above already contains specific details (section names, numbers, key terms, sub-points — e.g. from a syllabus or course outline), you MUST use those exact details as the factual basis for the slide's body/bullets/stats. Do NOT replace them with a generic summary of your own. Expand and elaborate on what's given — do not invent unrelated content or drop the specifics in favor of a vaguer restatement.
 
 ${coverRule}
 ${closingRule}
@@ -439,4 +487,4 @@ async function reviewAndImproveSlides(presentation) {
 }
 
 module.exports = { generateSlides, reviewAndImproveSlides, parseUserInput };
-  
+                                                                                                                                       
