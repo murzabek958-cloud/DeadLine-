@@ -32,11 +32,13 @@ const BOT_USERNAME = process.env.BOT_USERNAME || 'DeadLine_prezbot'; // Railway-
 
 const processing      = new Set();
 const waitingForCount = new Set();
+const waitingForTopic = new Set();
 
 // ─── Негізгі менюдің батырмалары ───────────────────────────────────────────
 const MAIN_KEYBOARD = {
   reply_markup: {
     keyboard: [
+      [{ text: '📝 Тақырып жазу' }],
       [{ text: '💳 Менің есепшотым' }, { text: '🔗 Реферал сілтемем' }],
       [{ text: '💰 Кредит сатып алу' }, { text: '❓ Көмек' }],
     ],
@@ -64,7 +66,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
   bot.sendMessage(
     chatId,
     '👋 Сәлем! Мен кәсіби презентация жасайтын ботпын.\n\n' +
-    `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\nТақырыпты жазыңыз немесе кредит сатып алыңыз.`,
+    `💳 *Баға:* ${PRICE}₸ — 1 презентация\n\n«📝 Тақырып жазу» батырмасын басып бастаңыз.`,
     MAIN_KEYBOARD
   );
 });
@@ -123,7 +125,7 @@ function showHelp(chatId) {
     '1️⃣ «💰 Кредит сатып алу» басыңыз\n' +
     '2️⃣ Kaspi арқылы төлеңіз\n' +
     '3️⃣ Чекті (PDF) осы ботқа жіберіңіз\n' +
-    '4️⃣ Кредит расталған соң тақырыпты жазыңыз\n\n' +
+    '4️⃣ Кредит расталған соң «📝 Тақырып жазу» басыңыз\n\n' +
     `📱 Kaspi: *${KASPI_PHONE}* (${KASPI_NAME})`,
     { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
@@ -149,7 +151,7 @@ bot.onText(/\/confirm (\d+) (\d+)/, async (msg, match) => {
     `✅ Төлем расталды!\n\n` +
     `💳 *${amount}* презентация кредиті қосылды.\n` +
     `📦 Жалпы кредитіңіз: *${user.credits}*\n\n` +
-    `Презентация тақырыбын жазыңыз — бастаймыз! 🚀`,
+    `«📝 Тақырып жазу» батырмасын басып бастаңыз! 🚀`,
     { parse_mode: 'Markdown', ...MAIN_KEYBOARD }
   );
 
@@ -167,7 +169,18 @@ bot.on('message', async (msg) => {
   if (text === '❓ Көмек')           return showHelp(chatId);
   if (text === '🔗 Реферал сілтемем') return showReferral(chatId);
 
+  if (text === '📝 Тақырып жазу') {
+    waitingForCount.delete(chatId); // eki rejim bir mezgilde bolmauy ushin
+    waitingForTopic.add(chatId);
+    return bot.sendMessage(
+      chatId,
+      '📝 Презентация тақырыбын жазыңыз:',
+      { parse_mode: 'Markdown' }
+    );
+  }
+
   if (text === '💰 Кредит сатып алу') {
+    waitingForTopic.delete(chatId); // eki rejim bir mezgilde bolmauy ushin
     waitingForCount.add(chatId);
     return bot.sendMessage(
       chatId,
@@ -220,15 +233,28 @@ bot.on('message', async (msg) => {
     );
   }
 
-  const user = await getUser(chatId);
+  if (waitingForTopic.has(chatId)) {
+    waitingForTopic.delete(chatId);
 
-  if (user.credits > 0) return makePresentaton(chatId, text);
+    const user = await getUser(chatId);
 
-  waitingForCount.add(chatId);
+    if (user.credits > 0) return makePresentaton(chatId, text);
+
+    waitingForCount.add(chatId);
+    return bot.sendMessage(
+      chatId,
+      `💳 Сізде презентация кредиті жоқ.\n\n💰 Баға: *${PRICE}₸* — 1 презентация\n\nНеше презентация керек? Санын жазыңыз:`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  // Ешбір режимде тұрмаса — бос мәтінді тікелей тақырып деп қабылдамай,
+  // батырманы басуды сұраймыз. Осы арқылы "1" сияқты жаңылыс жазылған
+  // мәтін де кездейсоқ сан/тақырып болып қате түсінілмейді.
   return bot.sendMessage(
     chatId,
-    `💳 Сізде презентация кредиті жоқ.\n\n💰 Баға: *${PRICE}₸* — 1 презентация\n\nНеше презентация керек? Санын жазыңыз:`,
-    { parse_mode: 'Markdown' }
+    'Презентация жасау үшін «📝 Тақырып жазу» батырмасын басыңыз.',
+    MAIN_KEYBOARD
   );
 });
 
@@ -325,4 +351,4 @@ initDB()
     process.exit(1);
   });
 
-    
+           
