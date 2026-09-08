@@ -26,7 +26,7 @@ function escapeMarkdown(text) {
 
 const KASPI_PHONE = '+77713436592';
 const KASPI_NAME  = 'Мурзабек Н';
-const PRICE       = 250;
+const PRICE       = 150;
 const ADMIN_ID    = process.env.ADMIN_CHAT_ID;
 const BOT_USERNAME = process.env.BOT_USERNAME || 'DeadLine_prezbot'; // Railway-да BOT_USERNAME env қой
 
